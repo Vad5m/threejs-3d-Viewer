@@ -20,3 +20,7 @@
 ⣿⢣⣿⣿⣿⣿⣿⣵⡶⠶⢎⣿⣿⣿⣿⣷⠄⣔⣿⣭⣭⣭⢉⡟⣻
 ⢳⣿⣿⣿⣿⣿⣿⣏⣾⣾⣿⣿⣿⣿⣿⣿⠇⣿⣿⣿⣿⢫⢎⡾⣿
 </pre>
+
+
+
+<img width="1920" height="1200" alt="изображение" src="https://github.com/user-attachments/assets/c9ddd19c-4ca1-40f0-9866-09da4cc1e28a" />
