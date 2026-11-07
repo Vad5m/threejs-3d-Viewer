@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Viewer Pro</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; color: #e0e0e0; }
+        #drop-overlay { position: fixed; inset: 0; background: rgba(160,160,160,0.15); border: 4px dashed #a0a0a0; z-index: 999; display: none; align-items: center; justify-content: center; pointer-events: none; backdrop-filter: blur(4px); }
+        #drop-overlay.active { display: flex; }
+        #drop-overlay .text { color: #fff; font-size: 32px; font-weight: 700; text-shadow: 0 0 20px rgba(160,160,160,0.8); background: rgba(0,0,0,0.5); padding: 30px 60px; border-radius: 20px; letter-spacing: 1px; }
+        #hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.35); font-size: 24px; text-align: center; pointer-events: none; z-index: 10; line-height: 1.5; transition: opacity 0.4s; }
+        #hint.hidden { opacity: 0; }
+        #hint .big { font-size: 60px; display: block; margin-bottom: 20px; opacity: 0.6; }
+        #status { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); color: #ffaa00; background: rgba(0,0,0,0.75); padding: 8px 20px; border-radius: 20px; font-size: 14px; z-index: 100; pointer-events: none; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(5px); max-width: 80vw; text-align: center; }
+        #status.show { opacity: 1; }
+
+        #effects-panel { position: fixed; top: 50%; right: 16px; transform: translateY(-50%) translateX(120%); width: 220px; max-height: 90vh; overflow-y: auto; background: rgba(30,30,30,0.85); border: 1px solid rgba(160,160,160,0.35); border-radius: 14px; padding: 12px; z-index: 200; backdrop-filter: blur(10px); box-shadow: 0 10px 40px rgba(0,0,0,0.5); transition: transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.45s; opacity: 0; }
+        #effects-panel.visible { transform: translateY(-50%) translateX(0); opacity: 1; }
+        #effects-panel::-webkit-scrollbar { width: 6px; }
+        #effects-panel::-webkit-scrollbar-thumb { background: rgba(160,160,160,0.4); border-radius: 3px; }
+        #effects-panel h3 { margin: 10px 0 6px; color: #e0e0e0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; text-align: center; opacity: 0.6; }
+        #effects-panel h3:first-child { margin-top: 0; }
+        .effect-btn { display: block; width: 100%; margin-bottom: 5px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: #e5e5e5; font-size: 12px; font-family: inherit; cursor: pointer; text-align: left; transition: background 0.2s, border-color 0.2s, transform 0.15s; }
+        .effect-btn:hover { background: rgba(160,160,160,0.22); border-color: rgba(160,160,160,0.6); transform: translateX(-2px); }
+        .effect-btn.active { background: rgba(160,160,160,0.35); border-color: #a0a0a0; box-shadow: 0 0 14px rgba(160,160,160,0.5) inset, 0 0 10px rgba(160,160,160,0.35); color: #fff; }
+        .effect-btn .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; box-shadow: 0 0 8px currentColor; background: currentColor; }
+        .effect-btn.toggle-btn.active { background: rgba(100,200,140,0.3); border-color: #64c88c; box-shadow: 0 0 14px rgba(100,200,140,0.4) inset; }
+        #effects-panel .divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0; }
+        #effects-panel input[type="range"] { width: 100%; margin: 4px 0 8px; accent-color: #a0a0a0; height: 4px; }
+        #effects-panel .row { display: flex; gap: 6px; margin-bottom: 5px; }
+        #effects-panel .row .effect-btn { flex: 1; text-align: center; margin-bottom: 0; padding: 8px 4px; font-size: 11px; }
+        #effects-toggle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); z-index: 201; width: 26px; height: 60px; background: rgba(30,30,30,0.8); border: 1px solid rgba(160,160,160,0.35); border-right: none; border-radius: 10px 0 0 10px; color: #e0e0e0; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 14px; backdrop-filter: blur(10px); }
+        #effects-toggle.visible { display: flex; }
+
+        #info { position: fixed; top: 12px; left: 12px; background: rgba(30,30,30,0.85); border: 1px solid rgba(160,160,160,0.35); border-radius: 10px; padding: 8px 12px; font-size: 11px; z-index: 150; backdrop-filter: blur(10px); line-height: 1.6; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 240px; }
+        #info.visible { opacity: 1; }
+        #info .k { opacity: 0.55; margin-right: 6px; }
+        #info .v { color: #fff; }
+
+        #fps { position: fixed; top: 12px; right: 12px; background: rgba(30,30,30,0.85); border: 1px solid rgba(160,160,160,0.35); border-radius: 8px; padding: 5px 10px; font-size: 11px; z-index: 150; font-family: monospace; backdrop-filter: blur(10px); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        #fps.visible { opacity: 1; }
+
+        #progress { position: fixed; top: 0; left: 0; width: 0%; height: 3px; background: linear-gradient(90deg, #66ffcc, #ff66cc); z-index: 1000; transition: width 0.2s, opacity 0.3s; opacity: 0; }
+        #progress.visible { opacity: 1; }
+
+        #animation-bar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(150%); display: flex; align-items: center; gap: 10px; background: rgba(30,30,30,0.88); border: 1px solid rgba(160,160,160,0.35); border-radius: 12px; padding: 8px 14px; z-index: 200; backdrop-filter: blur(10px); transition: transform 0.4s; max-width: 90vw; }
+        #animation-bar.visible { transform: translateX(-50%) translateY(0); }
+        #animation-bar select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e5e5e5; font-family: inherit; font-size: 12px; padding: 5px 8px; cursor: pointer; max-width: 180px; }
+        #animation-bar select option { background: #222; }
+        #animation-bar button { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e5e5e5; font-size: 14px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        #animation-bar button:hover { background: rgba(160,160,160,0.3); }
+        #animation-bar input[type="range"] { width: 200px; accent-color: #66ffcc; }
+        #animation-bar .time { font-family: monospace; font-size: 11px; opacity: 0.6; min-width: 70px; }
+
+        #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(30,30,30,0.92); border: 1px solid rgba(160,160,160,0.35); border-radius: 10px; padding: 10px 20px; font-size: 13px; z-index: 500; backdrop-filter: blur(10px); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        #toast.visible { opacity: 1; }
+
+        @media (max-width: 640px) {
+            #effects-panel { width: 180px; right: 8px; padding: 8px; }
+            #animation-bar { padding: 6px 10px; gap: 6px; }
+            #animation-bar input[type="range"] { width: 100px; }
+            #info { display: none; }
+            #hint .big { font-size: 40px; }
+            #hint { font-size: 16px; }
+        }
+    </style>
+  <script type="module" crossorigin src="/assets/index-lXVQmfE-.js"></script>
+</head>
+<body>
+    <div id="hint"><span class="big"></span>Just drag and drop a model file here<br><span style="font-size:16px; opacity:0.6;">GLB · GLTF · FBX · OBJ · STL · PLY · DAE · 3MF · AMF</span></div>
+    <div id="drop-overlay"><div class="text">Drop the file here</div></div>
+    <div id="progress"></div>
+    <div id="status">Loading...</div>
+    <div id="toast"></div>
+    <div id="info"></div>
+    <div id="fps">-- fps</div>
+
+    <div id="effects-toggle" title="Show effects">◀</div>
+
+    <div id="effects-panel">
+        <h3>Effects</h3>
+        <button class="effect-btn active" data-effect="normal"><span class="dot" style="color:#b0b0b0"></span>Normal</button>
+        <button class="effect-btn" data-effect="gray"><span class="dot" style="color:#888"></span>Gray</button>
+        <button class="effect-btn" data-effect="normals"><span class="dot" style="color:#ff66cc"></span>Normals</button>
+        <button class="effect-btn" data-effect="unlit"><span class="dot" style="color:#aaa"></span>Unlit</button>
+        <button class="effect-btn" data-effect="cartoon"><span class="dot" style="color:#ffaa00"></span>Cartoon</button>
+        <button class="effect-btn" data-effect="sketch"><span class="dot" style="color:#fff"></span>Sketch</button>
+        <button class="effect-btn" data-effect="xray"><span class="dot" style="color:#44aaff"></span>X-Ray</button>
+        <button class="effect-btn" data-effect="chrome"><span class="dot" style="color:#ccc"></span>Chrome</button>
+        <button class="effect-btn" data-effect="hologram"><span class="dot" style="color:#66ffcc"></span>Hologram</button>
+        <div class="divider"></div>
+        <h3>Background</h3>
+        <div class="row">
+            <button class="effect-btn active" data-bg="black">Black</button>
+            <button class="effect-btn" data-bg="gray">Gray</button>
+        </div>
+        <div class="row">
+            <button class="effect-btn" data-bg="gradient">Gradient</button>
+            <button class="effect-btn" data-bg="stars">Stars</button>
+        </div>
+        <div class="divider"></div>
+        <h3>Post FX</h3>
+        <button class="effect-btn toggle-btn" id="btn-bloom">Bloom</button>
+        <button class="effect-btn toggle-btn" id="btn-ssao">SSAO</button>
+        <button class="effect-btn toggle-btn" id="btn-vignette">Vignette</button>
+        <div class="divider"></div>
+        <h3>Lights</h3>
+        <button class="effect-btn toggle-btn active" id="btn-shadows">Shadows</button>
+        <div style="font-size:11px; opacity:0.55; margin:2px 0;">Exposure</div>
+        <input type="range" id="exposure" min="0.3" max="2.5" step="0.05" value="1.1">
+        <div class="divider"></div>
+        <button class="effect-btn" id="hide-panel" style="text-align:center; opacity:0.7;">Collapse ▶</button>
+    </div>
+
+    <div id="animation-bar">
+        <button id="anim-play">▶</button>
+        <select id="anim-select"></select>
+        <input type="range" id="anim-slider" min="0" max="1000" value="0">
+        <span class="time" id="anim-time">0.00s</span>
+    </div>
+
+    <!-- ЕДИНСТВЕННОЕ, ЧТО ИЗМЕНИЛОСЬ: ПОДКЛЮЧЕНИЕ MAIN.TS -->
+</body>
+</html>
