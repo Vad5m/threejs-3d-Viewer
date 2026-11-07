@@ -3,877 +3,835 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Viewer</title>
+    <title>3D Viewer Pro</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #000000;
-        }
-        #drop-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(160, 160, 160, 0.15);
-            border: 4px dashed #a0a0a0;
-            z-index: 999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            backdrop-filter: blur(4px);
-        }
+        * { box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; color: #e0e0e0; }
+        #drop-overlay { position: fixed; inset: 0; background: rgba(160,160,160,0.15); border: 4px dashed #a0a0a0; z-index: 999; display: none; align-items: center; justify-content: center; pointer-events: none; backdrop-filter: blur(4px); }
         #drop-overlay.active { display: flex; }
-        #drop-overlay .text {
-            color: white;
-            font-size: 32px;
-            font-weight: 700;
-            text-shadow: 0 0 20px rgba(160,160,160,0.8);
-            background: rgba(0,0,0,0.5);
-            padding: 30px 60px;
-            border-radius: 20px;
-            letter-spacing: 1px;
-        }
-        #hint {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255,255,255,0.35);
-            font-size: 24px;
-            text-align: center;
-            pointer-events: none;
-            z-index: 10;
-            line-height: 1.5;
-            transition: opacity 0.4s;
-        }
+        #drop-overlay .text { color: #fff; font-size: 32px; font-weight: 700; text-shadow: 0 0 20px rgba(160,160,160,0.8); background: rgba(0,0,0,0.5); padding: 30px 60px; border-radius: 20px; letter-spacing: 1px; }
+        #hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.35); font-size: 24px; text-align: center; pointer-events: none; z-index: 10; line-height: 1.5; transition: opacity 0.4s; }
         #hint.hidden { opacity: 0; }
-        #hint .big {
-            font-size: 60px;
-            display: block;
-            margin-bottom: 20px;
-            opacity: 0.6;
-        }
-        #status {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ffaa00;
-            background: rgba(0,0,0,0.6);
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-            z-index: 100;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s;
-            backdrop-filter: blur(5px);
-        }
+        #hint .big { font-size: 60px; display: block; margin-bottom: 20px; opacity: 0.6; }
+        #status { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); color: #ffaa00; background: rgba(0,0,0,0.75); padding: 8px 20px; border-radius: 20px; font-size: 14px; z-index: 100; pointer-events: none; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(5px); max-width: 80vw; text-align: center; }
         #status.show { opacity: 1; }
 
-        #effects-panel {
-            position: fixed;
-            top: 50%;
-            right: 16px;
-            transform: translateY(-50%) translateX(120%);
-            width: 200px;
-            background: rgba(30, 30, 30, 0.78);
-            border: 1px solid rgba(160, 160, 160, 0.35);
-            border-radius: 14px;
-            padding: 12px;
-            z-index: 200;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            transition: transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.45s;
-            opacity: 0;
-        }
-        #effects-panel.visible {
-            transform: translateY(-50%) translateX(0);
-            opacity: 1;
-        }
-        #effects-panel h3 {
-            margin: 0 0 10px;
-            color: #e0e0e0;
-            font-size: 13px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            text-align: center;
-            opacity: 0.8;
-        }
-        .effect-btn {
-            display: block;
-            width: 100%;
-            margin-bottom: 6px;
-            padding: 9px 12px;
-            border-radius: 9px;
-            border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.04);
-            color: #e5e5e5;
-            font-size: 13px;
-            font-family: inherit;
-            cursor: pointer;
-            text-align: left;
-            transition: background 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-        .effect-btn:hover {
-            background: rgba(160,160,160,0.22);
-            border-color: rgba(160,160,160,0.6);
-            transform: translateX(-2px);
-        }
-        .effect-btn.active {
-            background: rgba(160,160,160,0.35);
-            border-color: #a0a0a0;
-            box-shadow: 0 0 14px rgba(160,160,160,0.5) inset, 0 0 10px rgba(160,160,160,0.35);
-            color: #fff;
-        }
-        .effect-btn .dot {
-            display: inline-block;
-            width: 9px; height: 9px;
-            border-radius: 50%;
-            margin-right: 8px;
-            vertical-align: middle;
-            box-shadow: 0 0 8px currentColor;
-            background: currentColor;
-        }
-        #effects-panel .divider {
-            height: 1px;
-            background: rgba(255,255,255,0.08);
-            margin: 8px 0;
-        }
-        #effects-toggle {
-            position: fixed;
-            top: 50%;
-            right: 0;
-            transform: translateY(-50%);
-            z-index: 201;
-            width: 26px;
-            height: 60px;
-            background: rgba(30,30,30,0.8);
-            border: 1px solid rgba(160,160,160,0.35);
-            border-right: none;
-            border-radius: 10px 0 0 10px;
-            color: #e0e0e0;
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            backdrop-filter: blur(10px);
-        }
+        #effects-panel { position: fixed; top: 50%; right: 16px; transform: translateY(-50%) translateX(120%); width: 220px; max-height: 90vh; overflow-y: auto; background: rgba(30,30,30,0.85); border: 1px solid rgba(160,160,160,0.35); border-radius: 14px; padding: 12px; z-index: 200; backdrop-filter: blur(10px); box-shadow: 0 10px 40px rgba(0,0,0,0.5); transition: transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.45s; opacity: 0; }
+        #effects-panel.visible { transform: translateY(-50%) translateX(0); opacity: 1; }
+        #effects-panel::-webkit-scrollbar { width: 6px; }
+        #effects-panel::-webkit-scrollbar-thumb { background: rgba(160,160,160,0.4); border-radius: 3px; }
+        #effects-panel h3 { margin: 10px 0 6px; color: #e0e0e0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; text-align: center; opacity: 0.6; }
+        #effects-panel h3:first-child { margin-top: 0; }
+        .effect-btn { display: block; width: 100%; margin-bottom: 5px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: #e5e5e5; font-size: 12px; font-family: inherit; cursor: pointer; text-align: left; transition: background 0.2s, border-color 0.2s, transform 0.15s; }
+        .effect-btn:hover { background: rgba(160,160,160,0.22); border-color: rgba(160,160,160,0.6); transform: translateX(-2px); }
+        .effect-btn.active { background: rgba(160,160,160,0.35); border-color: #a0a0a0; box-shadow: 0 0 14px rgba(160,160,160,0.5) inset, 0 0 10px rgba(160,160,160,0.35); color: #fff; }
+        .effect-btn .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; box-shadow: 0 0 8px currentColor; background: currentColor; }
+        .effect-btn.toggle-btn.active { background: rgba(100,200,140,0.3); border-color: #64c88c; box-shadow: 0 0 14px rgba(100,200,140,0.4) inset; }
+        #effects-panel .divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0; }
+        #effects-panel input[type="range"] { width: 100%; margin: 4px 0 8px; accent-color: #a0a0a0; height: 4px; }
+        #effects-panel .row { display: flex; gap: 6px; margin-bottom: 5px; }
+        #effects-panel .row .effect-btn { flex: 1; text-align: center; margin-bottom: 0; padding: 8px 4px; font-size: 11px; }
+        #effects-toggle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); z-index: 201; width: 26px; height: 60px; background: rgba(30,30,30,0.8); border: 1px solid rgba(160,160,160,0.35); border-right: none; border-radius: 10px 0 0 10px; color: #e0e0e0; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 14px; backdrop-filter: blur(10px); }
         #effects-toggle.visible { display: flex; }
+
+        #info { position: fixed; top: 12px; left: 12px; background: rgba(30,30,30,0.85); border: 1px solid rgba(160,160,160,0.35); border-radius: 10px; padding: 8px 12px; font-size: 11px; z-index: 150; backdrop-filter: blur(10px); line-height: 1.6; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 240px; }
+        #info.visible { opacity: 1; }
+        #info .k { opacity: 0.55; margin-right: 6px; }
+        #info .v { color: #fff; }
+
+        #fps { position: fixed; top: 12px; right: 12px; background: rgba(30,30,30,0.85); border: 1px solid rgba(160,160,160,0.35); border-radius: 8px; padding: 5px 10px; font-size: 11px; z-index: 150; font-family: monospace; backdrop-filter: blur(10px); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        #fps.visible { opacity: 1; }
+
+        #progress { position: fixed; top: 0; left: 0; width: 0%; height: 3px; background: linear-gradient(90deg, #66ffcc, #ff66cc); z-index: 1000; transition: width 0.2s, opacity 0.3s; opacity: 0; }
+        #progress.visible { opacity: 1; }
+
+        #animation-bar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(150%); display: flex; align-items: center; gap: 10px; background: rgba(30,30,30,0.88); border: 1px solid rgba(160,160,160,0.35); border-radius: 12px; padding: 8px 14px; z-index: 200; backdrop-filter: blur(10px); transition: transform 0.4s; max-width: 90vw; }
+        #animation-bar.visible { transform: translateX(-50%) translateY(0); }
+        #animation-bar select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e5e5e5; font-family: inherit; font-size: 12px; padding: 5px 8px; cursor: pointer; max-width: 180px; }
+        #animation-bar select option { background: #222; }
+        #animation-bar button { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e5e5e5; font-size: 14px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        #animation-bar button:hover { background: rgba(160,160,160,0.3); }
+        #animation-bar input[type="range"] { width: 200px; accent-color: #66ffcc; }
+        #animation-bar .time { font-family: monospace; font-size: 11px; opacity: 0.6; min-width: 70px; }
+
+        #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(30,30,30,0.92); border: 1px solid rgba(160,160,160,0.35); border-radius: 10px; padding: 10px 20px; font-size: 13px; z-index: 500; backdrop-filter: blur(10px); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        #toast.visible { opacity: 1; }
+
+        @media (max-width: 640px) {
+            #effects-panel { width: 180px; right: 8px; padding: 8px; }
+            #animation-bar { padding: 6px 10px; gap: 6px; }
+            #animation-bar input[type="range"] { width: 100px; }
+            #info { display: none; }
+            #hint .big { font-size: 40px; }
+            #hint { font-size: 16px; }
+        }
     </style>
 </head>
 <body>
-
-    <div id="hint">
-        <span class="big"></span>
-        Just drag and drop a model file here<br>
-        <span style="font-size: 16px; opacity: 0.6;">GLB · GLTF · FBX · OBJ · STL · PLY · DAE · 3MF · AMF</span>
-    </div>
-
-    <div id="drop-overlay">
-        <div class="text">Drop the file here</div>
-    </div>
-
+    <div id="hint"><span class="big"></span>Just drag and drop a model file here<br><span style="font-size:16px; opacity:0.6;">GLB · GLTF · FBX · OBJ · STL · PLY · DAE · 3MF · AMF</span></div>
+    <div id="drop-overlay"><div class="text">Drop the file here</div></div>
+    <div id="progress"></div>
     <div id="status">Loading...</div>
+    <div id="toast"></div>
+    <div id="info"></div>
+    <div id="fps">-- fps</div>
 
     <div id="effects-toggle" title="Show effects">◀</div>
 
     <div id="effects-panel">
         <h3>Effects</h3>
-
-        <button class="effect-btn active" data-effect="normal">
-            <span class="dot" style="color:#b0b0b0"></span>Normal
-        </button>
-        <button class="effect-btn" data-effect="gray">
-            <span class="dot" style="color:#888888"></span>Gray
-        </button>
-        <button class="effect-btn" data-effect="normals">
-            <span class="dot" style="color:#ff66cc"></span>Normals
-        </button>
-        <button class="effect-btn" data-effect="unlit">
-            <span class="dot" style="color:#aaaaaa"></span>Unlit
-        </button>
-        <button class="effect-btn" data-effect="cartoon">
-            <span class="dot" style="color:#ffaa00"></span>Cartoon
-        </button>
-        <button class="effect-btn" data-effect="sketch">
-            <span class="dot" style="color:#ffffff"></span>Sketch
-        </button>
-
+        <button class="effect-btn active" data-effect="normal"><span class="dot" style="color:#b0b0b0"></span>Normal</button>
+        <button class="effect-btn" data-effect="gray"><span class="dot" style="color:#888"></span>Gray</button>
+        <button class="effect-btn" data-effect="normals"><span class="dot" style="color:#ff66cc"></span>Normals</button>
+        <button class="effect-btn" data-effect="unlit"><span class="dot" style="color:#aaa"></span>Unlit</button>
+        <button class="effect-btn" data-effect="cartoon"><span class="dot" style="color:#ffaa00"></span>Cartoon</button>
+        <button class="effect-btn" data-effect="sketch"><span class="dot" style="color:#fff"></span>Sketch</button>
+        <button class="effect-btn" data-effect="xray"><span class="dot" style="color:#44aaff"></span>X-Ray</button>
+        <button class="effect-btn" data-effect="chrome"><span class="dot" style="color:#ccc"></span>Chrome</button>
+        <button class="effect-btn" data-effect="hologram"><span class="dot" style="color:#66ffcc"></span>Hologram</button>
         <div class="divider"></div>
-
-        <button class="effect-btn" data-effect="hologram">
-            <span class="dot" style="color:#66ffcc"></span>Hologram
-        </button>
-
+        <h3>Background</h3>
+        <div class="row">
+            <button class="effect-btn active" data-bg="black">Black</button>
+            <button class="effect-btn" data-bg="gray">Gray</button>
+        </div>
+        <div class="row">
+            <button class="effect-btn" data-bg="gradient">Gradient</button>
+            <button class="effect-btn" data-bg="stars">Stars</button>
+        </div>
         <div class="divider"></div>
+        <h3>Post FX</h3>
+        <button class="effect-btn toggle-btn" id="btn-bloom">Bloom</button>
+        <button class="effect-btn toggle-btn" id="btn-ssao">SSAO</button>
+        <button class="effect-btn toggle-btn" id="btn-vignette">Vignette</button>
+        <div class="divider"></div>
+        <h3>Lights</h3>
+        <button class="effect-btn toggle-btn active" id="btn-shadows">Shadows</button>
+        <div style="font-size:11px; opacity:0.55; margin:2px 0;">Exposure</div>
+        <input type="range" id="exposure" min="0.3" max="2.5" step="0.05" value="1.1">
+        <div class="divider"></div>
+        <button class="effect-btn" id="hide-panel" style="text-align:center; opacity:0.7;">Collapse ▶</button>
+    </div>
 
-        <button class="effect-btn" id="hide-panel" style="text-align:center; opacity:0.7;">
-            Collapse ▶
-        </button>
+    <div id="animation-bar">
+        <button id="anim-play">▶</button>
+        <select id="anim-select"></select>
+        <input type="range" id="anim-slider" min="0" max="1000" value="0">
+        <span class="time" id="anim-time">0.00s</span>
     </div>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
-            }
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
         }
+    }
     </script>
 
     <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-        import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-        import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
-        import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
-        import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
-        import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
-        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+    const statusEl = document.getElementById('status');
+    function fatal(msg) {
+        statusEl.textContent = msg;
+        statusEl.style.color = '#ff6b6b';
+        statusEl.classList.add('show');
+        console.error(msg);
+    }
+    window.addEventListener('error', (e) => fatal('JS Error: ' + (e.message || 'unknown')));
+    window.addEventListener('unhandledrejection', (e) => fatal('Promise Error: ' + (e.reason && e.reason.message || e.reason)));
 
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000);
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+    import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+    import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
+    import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
+    import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-        const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 10000);
-        camera.position.set(0, 2, 5);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
 
-        const renderer = new THREE.WebGLRenderer({
-            antialias: true,
-            powerPreference: 'high-performance',
-            stencil: false,
-            depth: true
-        });
-        renderer.setSize(innerWidth, innerHeight);
-        renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-        renderer.outputEncoding = THREE.sRGBEncoding;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.1;
-        document.body.appendChild(renderer.domElement);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 10000);
+    camera.position.set(0, 2, 5);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.06;
-        controls.rotateSpeed = 0.8;
-        controls.zoomSpeed = 1.2;
-        controls.panSpeed = 0.8;
-        controls.minDistance = 0.05;
-        controls.maxDistance = 5000;
-        controls.target.set(0, 1, 0);
-        controls.enablePan = true;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = false;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0x505050, 1.2));
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.rotateSpeed = 0.8;
+    controls.zoomSpeed = 1.2;
+    controls.panSpeed = 0.8;
+    controls.minDistance = 0.05;
+    controls.maxDistance = 5000;
+    controls.target.set(0, 1, 0);
+    controls.autoRotateSpeed = 2.0;
 
-        const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
-        keyLight.position.set(3, 6, 4);
-        keyLight.castShadow = false;
-        scene.add(keyLight);
+    scene.add(new THREE.AmbientLight(0x505050, 1.2));
 
-        const rimLight = new THREE.DirectionalLight(0xffddaa, 0.9);
-        rimLight.position.set(-4, 3, -5);
-        scene.add(rimLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    keyLight.position.set(3, 6, 4);
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 500;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
 
-        const fillLight = new THREE.PointLight(0xaaaaaa, 0.6);
-        fillLight.position.set(0, 4, 3);
-        scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xffddaa, 0.9);
+    rimLight.position.set(-4, 3, -5);
+    scene.add(rimLight);
 
-        const topLight = new THREE.PointLight(0xffffff, 0.5);
-        topLight.position.set(0, 12, 0);
-        scene.add(topLight);
+    const fillLight = new THREE.PointLight(0xaaaaaa, 0.6);
+    fillLight.position.set(0, 4, 3);
+    scene.add(fillLight);
+    const topLight = new THREE.PointLight(0xffffff, 0.5);
+    topLight.position.set(0, 12, 0);
+    scene.add(topLight);
 
-        const grid = new THREE.GridHelper(20, 20, 0x888888, 0x444444);
-        grid.position.y = -0.5;
-        grid.material.transparent = true;
-        grid.material.opacity = 0.3;
-        scene.add(grid);
+    const grid = new THREE.GridHelper(20, 20, 0x888888, 0x444444);
+    grid.position.y = -0.5;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.3;
+    scene.add(grid);
 
-        const starGeo = new THREE.BufferGeometry();
-        const starCount = 1500;
-        const starPos = new Float32Array(starCount * 3);
-        for (let i = 0; i < starCount * 3; i += 3) {
-            starPos[i]   = (Math.random() - 0.5) * 3000;
-            starPos[i+1] = (Math.random() - 0.5) * 3000;
-            starPos[i+2] = (Math.random() - 0.5) * 3000;
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 1500;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i += 3) {
+        starPos[i] = (Math.random() - 0.5) * 3000;
+        starPos[i+1] = (Math.random() - 0.5) * 3000;
+        starPos[i+2] = (Math.random() - 0.5) * 3000;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, transparent: true, opacity: 0.3, depthWrite: false, sizeAttenuation: false }));
+    stars.frustumCulled = false;
+    stars.visible = false;
+    scene.add(stars);
+
+    const modelGroup = new THREE.Group();
+    scene.add(modelGroup);
+    let currentModel = null;
+
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(draco);
+    gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+
+    const fbxLoader = new FBXLoader();
+    const objLoader = new OBJLoader();
+    const stlLoader = new STLLoader();
+    const plyLoader = new PLYLoader();
+    const colladaLoader = new ColladaLoader();
+    const threeMFLoader = new ThreeMFLoader();
+    const amfLoader = new AMFLoader();
+
+    const overlay = document.getElementById('drop-overlay');
+    const hintEl = document.getElementById('hint');
+    const panelEl = document.getElementById('effects-panel');
+    const toggleEl = document.getElementById('effects-toggle');
+    const infoEl = document.getElementById('info');
+    const fpsEl = document.getElementById('fps');
+    const progressEl = document.getElementById('progress');
+    const toastEl = document.getElementById('toast');
+    const animBar = document.getElementById('animation-bar');
+    const animSelect = document.getElementById('anim-select');
+    const animSlider = document.getElementById('anim-slider');
+    const animPlay = document.getElementById('anim-play');
+    const animTime = document.getElementById('anim-time');
+
+    let toastTimer = null;
+    function showStatus(msg, isError = false) {
+        statusEl.textContent = msg;
+        statusEl.style.color = isError ? '#ff6b6b' : '#ffaa00';
+        statusEl.classList.add('show');
+        if (!isError) {
+            clearTimeout(showStatus._t);
+            showStatus._t = setTimeout(() => statusEl.classList.remove('show'), 2500);
         }
-        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-        const starMat = new THREE.PointsMaterial({
-            color: 0xffffff,
-            size: 0.6,
-            transparent: true,
-            opacity: 0.3,
-            depthWrite: false,
-            sizeAttenuation: false
-        });
-        const stars = new THREE.Points(starGeo, starMat);
-        stars.frustumCulled = false;
-        stars.matrixAutoUpdate = false;
-        scene.add(stars);
+    }
+    function showToast(msg, dur = 1800) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('visible'), dur);
+    }
 
-        const modelGroup = new THREE.Group();
-        scene.add(modelGroup);
-        let currentModel = null;
+    const effectUniforms = { uMix: { value: 0 }, uTime: { value: 0 } };
+    const matCache = new Map();
 
-        const draco = new DRACOLoader();
-        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
-
-        const gltfLoader = new GLTFLoader();
-        gltfLoader.setDRACOLoader(draco);
-        gltfLoader.setMeshoptDecoder(MeshoptDecoder);
-
-        const fbxLoader     = new FBXLoader();
-        const objLoader     = new OBJLoader();
-        const stlLoader     = new STLLoader();
-        const plyLoader     = new PLYLoader();
-        const colladaLoader = new ColladaLoader();
-        const threeMFLoader = new ThreeMFLoader();
-        const amfLoader     = new AMFLoader();
-
-        const overlay   = document.getElementById('drop-overlay');
-        const statusEl  = document.getElementById('status');
-        const hintEl    = document.getElementById('hint');
-        const panelEl   = document.getElementById('effects-panel');
-        const toggleEl  = document.getElementById('effects-toggle');
-
-        function showStatus(msg, isError = false) {
-            statusEl.textContent = msg;
-            statusEl.style.color = isError ? '#ff6b6b' : '#ffaa00';
-            statusEl.classList.add('show');
-            if (!isError) {
-                clearTimeout(showStatus._t);
-                showStatus._t = setTimeout(() => statusEl.classList.remove('show'), 2500);
+    function materialKey(effect, orig) {
+        const mapId = orig.map ? orig.map.uuid : '';
+        const colorId = orig.color ? orig.color.getHexString() : 'ffffff';
+        const roughId = orig.roughness !== undefined ? orig.roughness.toFixed(2) : '0.5';
+        const metalId = orig.metalness !== undefined ? orig.metalness.toFixed(2) : '0.0';
+        return effect + '|' + mapId + '|' + colorId + '|' + roughId + '|' + metalId;
+    }
+    function getCachedMaterial(effect, orig, factory) {
+        const key = materialKey(effect, orig);
+        let m = matCache.get(key);
+        if (m === undefined) { m = factory(orig); matCache.set(key, m); }
+        return m;
+    }
+    function clearMatCache() {
+        matCache.forEach(m => {
+            if (m && m.dispose) {
+                for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); }
+                m.dispose();
             }
-        }
+        });
+        matCache.clear();
+    }
 
-        const effectUniforms = {
-            uMix:  { value: 0 },
-            uTime: { value: 0 }
+    function makeHologramMat() {
+        const m = new THREE.MeshLambertMaterial({ color: 0x66ffcc, emissive: 0x00ffaa, emissiveIntensity: 1.4, transparent: true, opacity: 0.45, side: THREE.FrontSide });
+        m.onBeforeCompile = (shader) => {
+            shader.uniforms.uMix = effectUniforms.uMix;
+            shader.uniforms.uTime = effectUniforms.uTime;
+            shader.vertexShader = 'varying vec3 vWorldPos;\nvarying vec3 vNormalW;\n' + shader.vertexShader.replace(
+                '#include <worldpos_vertex>',
+                '#include <worldpos_vertex>\n vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vNormalW = normalize(mat3(modelMatrix) * objectNormal);'
+            );
+            shader.fragmentShader = 'uniform float uMix;\nuniform float uTime;\nvarying vec3 vWorldPos;\nvarying vec3 vNormalW;\n' + shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                '#include <dithering_fragment>\n' +
+                'float bands = sin(vWorldPos.y * 80.0 + uTime * 6.0) * 0.5 + 0.5;\n' +
+                'float scan = smoothstep(0.4, 0.6, bands);\n' +
+                'vec3 viewDir = normalize(cameraPosition - vWorldPos);\n' +
+                'float fres = pow(1.0 - abs(dot(viewDir, vNormalW)), 2.5);\n' +
+                'vec3 holo = gl_FragColor.rgb + vec3(0.0, 0.35, 0.25) * scan * 0.7 + vec3(0.0, 0.6, 0.4) * fres;\n' +
+                'gl_FragColor.rgb = mix(gl_FragColor.rgb, holo, uMix);\n' +
+                'gl_FragColor.a = mix(1.0, 0.45 + 0.25 * scan + 0.3 * fres, uMix);'
+            );
         };
+        return m;
+    }
+    const makeGrayMat = () => new THREE.MeshLambertMaterial({ color: 0xb0b0b0, side: THREE.FrontSide });
+    const makeNormalsMat = () => new THREE.MeshNormalMaterial({ side: THREE.FrontSide });
+    const makeUnlitMat = (orig) => new THREE.MeshBasicMaterial({ map: orig.map || null, color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff), side: THREE.FrontSide });
+    function makeCartoonMat(orig) {
+        const m = new THREE.MeshStandardMaterial({ color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff), map: orig.map || null, roughness: 0.7, metalness: 0.0, side: THREE.DoubleSide });
+        m.onBeforeCompile = (shader) => {
+            shader.vertexShader = 'varying vec3 vNormalW;\nvarying vec3 vViewDir;\n' + shader.vertexShader.replace(
+                '#include <worldpos_vertex>',
+                '#include <worldpos_vertex>\n vNormalW = normalize(mat3(modelMatrix) * objectNormal);\n vec3 worldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vViewDir = normalize(cameraPosition - worldPos);'
+            );
+            shader.fragmentShader = 'varying vec3 vNormalW;\nvarying vec3 vViewDir;\n' + shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                '#include <dithering_fragment>\n float edge = 1.0 - abs(dot(vNormalW, vViewDir));\n float line = smoothstep(0.55, 0.75, edge);\n gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.0), line * 0.9);'
+            );
+        };
+        return m;
+    }
+    function makeSketchMat() {
+        const m = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.FrontSide });
+        m.onBeforeCompile = (shader) => {
+            shader.vertexShader = 'varying vec3 vNormalW;\nvarying vec3 vViewDir;\nvarying vec3 vWorldPos;\n' + shader.vertexShader.replace(
+                '#include <worldpos_vertex>',
+                '#include <worldpos_vertex>\n vNormalW = normalize(mat3(modelMatrix) * objectNormal);\n vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vViewDir = normalize(cameraPosition - vWorldPos);'
+            );
+            shader.fragmentShader = 'varying vec3 vNormalW;\nvarying vec3 vViewDir;\nvarying vec3 vWorldPos;\n' + shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                '#include <dithering_fragment>\n' +
+                'float ndotv = abs(dot(vNormalW, vViewDir));\n' +
+                'float shade = smoothstep(0.15, 0.6, ndotv);\n' +
+                'vec3 paper = vec3(1.0);\nvec3 ink = vec3(0.0);\n' +
+                'float hatchCoord = (vWorldPos.x + vWorldPos.y * 1.3 + vWorldPos.z) * 45.0;\n' +
+                'float hatch = step(0.5, fract(hatchCoord));\n' +
+                'float line = (1.0 - shade);\n' +
+                'float thick = smoothstep(0.2, 0.8, line);\n' +
+                'gl_FragColor.rgb = mix(paper, ink, thick * hatch * 0.95);\n' +
+                'gl_FragColor.a = 1.0;'
+            );
+        };
+        return m;
+    }
+    const makeXRayMat = () => new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false });
+    const makeChromeMat = () => new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.5 });
 
-        const matCache = new Map();
+    const EFFECT_FACTORIES = {
+        normal: null, gray: makeGrayMat, normals: makeNormalsMat, unlit: makeUnlitMat,
+        cartoon: makeCartoonMat, sketch: makeSketchMat, xray: makeXRayMat,
+        chrome: makeChromeMat, hologram: makeHologramMat
+    };
 
-        function materialKey(effect, orig) {
-            const mapId = orig.map ? orig.map.uuid : '';
-            const colorId = orig.color ? orig.color.getHexString() : 'ffffff';
-            return effect + '|' + mapId + '|' + colorId;
-        }
+    const meshRecords = new Map();
 
-        function getCachedMaterial(effect, orig, factory) {
-            const key = materialKey(effect, orig);
-            let m = matCache.get(key);
-            if (m === undefined) {
-                m = factory(orig);
-                matCache.set(key, m);
-            }
-            return m;
-        }
-
-        function clearMatCache() {
-            matCache.forEach(m => {
-                if (m && m.dispose) {
-                    for (const k in m) {
-                        const v = m[k];
-                        if (v && v.isTexture) v.dispose();
-                    }
+    function clearModel() {
+        if (!currentModel) return;
+        stopAnimations();
+        modelGroup.remove(currentModel);
+        currentModel.traverse((node) => {
+            if (node.geometry) node.geometry.dispose();
+            if (node.material) {
+                const mats = Array.isArray(node.material) ? node.material : [node.material];
+                mats.forEach(m => {
+                    for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); }
                     m.dispose();
+                });
+            }
+        });
+        clearMatCache();
+        meshRecords.clear();
+        currentModel = null;
+        panelEl.classList.remove('visible');
+        toggleEl.classList.remove('visible');
+        infoEl.classList.remove('visible');
+        animBar.classList.remove('visible');
+        setActiveButton('normal');
+        activeEffect = 'normal';
+        effectMix = 0;
+        needsRender = true;
+    }
+
+    function fitModelToView(object) {
+        const box = new THREE.Box3().setFromObject(object);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        object.position.sub(center);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim > 0) object.scale.multiplyScalar(2.5 / maxDim);
+        const newSize = size.clone().multiplyScalar(object.scale.x);
+        controls.target.set(0, 0, 0);
+        const dist = Math.max(newSize.x, newSize.y, newSize.z) * 1.9;
+        const dir = new THREE.Vector3(1, 0.8, 1).normalize();
+        camera.position.copy(dir.multiplyScalar(dist));
+        camera.near = Math.max(0.001, dist / 1000);
+        camera.far = Math.max(dist * 100, 10000);
+        camera.updateProjectionMatrix();
+        grid.position.y = box.min.y * object.scale.x + object.position.y;
+        controls.update();
+        needsRender = true;
+    }
+
+    function updateInfo() {
+        if (!currentModel) { infoEl.classList.remove('visible'); return; }
+        let meshes = 0, tris = 0, verts = 0;
+        const mats = new Set(), texs = new Set();
+        currentModel.traverse(n => {
+            if (n.isMesh) {
+                meshes++;
+                if (n.geometry) {
+                    if (n.geometry.index) tris += n.geometry.index.count / 3;
+                    else if (n.geometry.attributes.position) tris += n.geometry.attributes.position.count / 3;
+                    if (n.geometry.attributes.position) verts += n.geometry.attributes.position.count;
                 }
-            });
-            matCache.clear();
-        }
+                if (n.material) {
+                    const ms = Array.isArray(n.material) ? n.material : [n.material];
+                    ms.forEach(m => { mats.add(m); if (m.map) texs.add(m.map); });
+                }
+            }
+        });
+        infoEl.innerHTML = '<div><span class="k">Meshes:</span><span class="v">' + meshes + '</span></div>' +
+            '<div><span class="k">Vertices:</span><span class="v">' + verts.toLocaleString() + '</span></div>' +
+            '<div><span class="k">Triangles:</span><span class="v">' + Math.round(tris).toLocaleString() + '</span></div>' +
+            '<div><span class="k">Materials:</span><span class="v">' + mats.size + '</span></div>' +
+            '<div><span class="k">Textures:</span><span class="v">' + texs.size + '</span></div>';
+        infoEl.classList.add('visible');
+    }
 
-        function makeHologramMat() {
-            const m = new THREE.MeshLambertMaterial({
-                color: 0x66ffcc,
-                emissive: 0x00ffaa,
-                emissiveIntensity: 1.4,
-                transparent: true,
-                opacity: 0.45,
-                side: THREE.FrontSide,
-                depthWrite: true
-            });
-            m.onBeforeCompile = (shader) => {
-                shader.uniforms.uMix = effectUniforms.uMix;
-                shader.uniforms.uTime = effectUniforms.uTime;
-                shader.vertexShader = `
-                    varying vec3 vWorldPos;
-                    varying vec3 vNormalW;
-                ` + shader.vertexShader.replace(
-                    '#include <worldpos_vertex>',
-                    `#include <worldpos_vertex>
-                     vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-                     vNormalW = normalize(mat3(modelMatrix) * objectNormal);`
-                );
-                shader.fragmentShader = `
-                    uniform float uMix;
-                    uniform float uTime;
-                    varying vec3 vWorldPos;
-                    varying vec3 vNormalW;
-                ` + shader.fragmentShader.replace(
-                    '#include <dithering_fragment>',
-                    `#include <dithering_fragment>
-                     float bands = sin(vWorldPos.y * 80.0 + uTime * 6.0) * 0.5 + 0.5;
-                     float scan = smoothstep(0.4, 0.6, bands);
-                     vec3 viewDir = normalize(cameraPosition - vWorldPos);
-                     float fres = pow(1.0 - abs(dot(viewDir, vNormalW)), 2.5);
-                     vec3 holo = gl_FragColor.rgb + vec3(0.0, 0.35, 0.25) * scan * 0.7 + vec3(0.0, 0.6, 0.4) * fres;
-                     gl_FragColor.rgb = mix(gl_FragColor.rgb, holo, uMix);
-                     gl_FragColor.a = mix(1.0, 0.45 + 0.25 * scan + 0.3 * fres, uMix);`
-                );
-            };
-            return m;
-        }
-
-        function makeGrayMat() {
-            return new THREE.MeshLambertMaterial({
-                color: 0xb0b0b0,
-                side: THREE.FrontSide
-            });
-        }
-
-        function makeNormalsMat() {
-            return new THREE.MeshNormalMaterial({
-                side: THREE.FrontSide
-            });
-        }
-
-        function makeUnlitMat(orig) {
-            return new THREE.MeshBasicMaterial({
-                map: orig.map || null,
-                color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
-                side: THREE.FrontSide
-            });
-        }
-
-        function makeCartoonMat(orig) {
-            const m = new THREE.MeshStandardMaterial({
-                color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
-                map: orig.map || null,
-                roughness: 0.7,
-                metalness: 0.0,
-                side: THREE.DoubleSide
-            });
-            m.onBeforeCompile = (shader) => {
-                shader.vertexShader = `
-                    varying vec3 vNormalW;
-                    varying vec3 vViewDir;
-                ` + shader.vertexShader.replace(
-                    '#include <worldpos_vertex>',
-                    `#include <worldpos_vertex>
-                     vNormalW = normalize(mat3(modelMatrix) * objectNormal);
-                     vec3 worldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-                     vViewDir = normalize(cameraPosition - worldPos);`
-                );
-                shader.fragmentShader = `
-                    varying vec3 vNormalW;
-                    varying vec3 vViewDir;
-                ` + shader.fragmentShader.replace(
-                    '#include <dithering_fragment>',
-                    `#include <dithering_fragment>
-                     float edge = 1.0 - abs(dot(vNormalW, vViewDir));
-                     float line = smoothstep(0.55, 0.75, edge);
-                     gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.0, 0.0, 0.0), line * 0.9);`
-                );
-            };
-            return m;
-        }
-
-        function makeSketchMat() {
-            const m = new THREE.MeshLambertMaterial({
-                color: 0xffffff,
-                side: THREE.FrontSide
-            });
-            m.onBeforeCompile = (shader) => {
-                shader.vertexShader = `
-                    varying vec3 vNormalW;
-                    varying vec3 vViewDir;
-                    varying vec3 vWorldPos;
-                ` + shader.vertexShader.replace(
-                    '#include <worldpos_vertex>',
-                    `#include <worldpos_vertex>
-                     vNormalW = normalize(mat3(modelMatrix) * objectNormal);
-                     vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-                     vViewDir = normalize(cameraPosition - vWorldPos);`
-                );
-                shader.fragmentShader = `
-                    varying vec3 vNormalW;
-                    varying vec3 vViewDir;
-                    varying vec3 vWorldPos;
-                ` + shader.fragmentShader.replace(
-                    '#include <dithering_fragment>',
-                    `#include <dithering_fragment>
-                     float ndotv = abs(dot(vNormalW, vViewDir));
-                     float shade = smoothstep(0.15, 0.6, ndotv);
-                     vec3 paper = vec3(1.0, 1.0, 1.0);
-                     vec3 ink = vec3(0.0, 0.0, 0.0);
-                     float hatchCoord = (vWorldPos.x + vWorldPos.y * 1.3 + vWorldPos.z) * 45.0;
-                     float hatch = step(0.5, fract(hatchCoord));
-                     float line = (1.0 - shade);
-                     float thick = smoothstep(0.2, 0.8, line);
-                     float finalLine = thick * hatch;
-                     gl_FragColor.rgb = mix(paper, ink, finalLine * 0.95);
-                     gl_FragColor.a = 1.0;`
-                );
-            };
-            return m;
-        }
-
-        const EFFECT_FACTORIES = {
-            normal:   null,
-            gray:     makeGrayMat,
-            normals:  makeNormalsMat,
-            unlit:    makeUnlitMat,
-            cartoon:  makeCartoonMat,
-            sketch:   makeSketchMat,
-            hologram: makeHologramMat
+    function handleFile(file) {
+        if (!file) return;
+        hintEl.classList.add('hidden');
+        showStatus('Loading: ' + file.name);
+        clearModel();
+        const ext = file.name.split('.').pop().toLowerCase();
+        const binaryFormats = ['glb', 'stl', 'ply', '3mf', 'amf', 'fbx', 'dae'];
+        const isBinary = binaryFormats.includes(ext);
+        progressEl.classList.add('visible');
+        progressEl.style.width = '0%';
+        const reader = new FileReader();
+        reader.onprogress = (e) => { if (e.lengthComputable) progressEl.style.width = (e.loaded / e.total * 100) + '%'; };
+        reader.onload = (e) => {
+            progressEl.style.width = '100%';
+            setTimeout(() => progressEl.classList.remove('visible'), 300);
+            try { loadByExtension(ext, e.target.result, file.name); }
+            catch (err) { console.error(err); showStatus('Error: ' + err.message, true); }
         };
+        reader.onerror = () => showStatus('Failed to read file', true);
+        if (isBinary) reader.readAsArrayBuffer(file);
+        else reader.readAsText(file);
+    }
 
-        const meshRecords = new Map();
+    function loadByExtension(ext, data, sourceName) {
+        const basePath = sourceName && sourceName.includes('/') ? sourceName.substring(0, sourceName.lastIndexOf('/') + 1) : '';
+        switch (ext) {
+            case 'glb': case 'gltf':
+                gltfLoader.parse(data, basePath, (gltf) => {
+                    currentModel = gltf.scene;
+                    animations = gltf.animations || [];
+                    postProcessAndAdd(currentModel);
+                }, (err) => { console.error(err); showStatus('GLB/GLTF error: ' + err.message, true); });
+                break;
+            case 'fbx':
+                currentModel = fbxLoader.parse(data, basePath);
+                animations = currentModel.animations || [];
+                postProcessAndAdd(currentModel);
+                break;
+            case 'obj':
+                currentModel = objLoader.parse(data);
+                animations = [];
+                postProcessAndAdd(currentModel);
+                break;
+            case 'stl': {
+                const g = stlLoader.parse(data);
+                g.computeVertexNormals();
+                currentModel = new THREE.Mesh(g, defaultMat());
+                animations = [];
+                postProcessAndAdd(currentModel);
+                break;
+            }
+            case 'ply': {
+                const g = plyLoader.parse(data);
+                g.computeVertexNormals();
+                currentModel = new THREE.Mesh(g, defaultMat());
+                animations = [];
+                postProcessAndAdd(currentModel);
+                break;
+            }
+            case 'dae': {
+                const c = colladaLoader.parse(data, basePath);
+                currentModel = c.scene;
+                animations = c.animations || [];
+                postProcessAndAdd(currentModel);
+                break;
+            }
+            case '3mf':
+                threeMFLoader.parse(data, (obj) => { currentModel = obj; animations = []; postProcessAndAdd(currentModel); },
+                    (err) => { console.error(err); showStatus('3MF error: ' + err.message, true); });
+                break;
+            case 'amf':
+                amfLoader.parse(data, (obj) => { currentModel = obj; animations = []; postProcessAndAdd(currentModel); },
+                    (err) => { console.error(err); showStatus('AMF error: ' + err.message, true); });
+                break;
+            default:
+                showStatus('.' + ext + ' format is not supported', true);
+        }
+    }
 
-        function clearModel() {
-            if (!currentModel) return;
-            modelGroup.remove(currentModel);
-            currentModel.traverse((node) => {
-                if (node.geometry) node.geometry.dispose();
+    function defaultMat() { return new THREE.MeshLambertMaterial({ color: 0xb0b0b0, side: THREE.FrontSide }); }
+
+    let animations = [];
+    let mixer = null;
+    let currentAction = null;
+    let animPlaying = false;
+
+    function postProcessAndAdd(object) {
+        object.traverse((node) => {
+            if (node.isMesh) {
+                node.castShadow = false;
+                node.receiveShadow = false;
+                node.frustumCulled = true;
+                if (node.geometry) node.geometry.computeBoundingSphere();
                 if (node.material) {
                     const mats = Array.isArray(node.material) ? node.material : [node.material];
                     mats.forEach(m => {
-                        for (const k in m) {
-                            const v = m[k];
-                            if (v && v.isTexture) v.dispose();
-                        }
-                        m.dispose();
+                        if (m && m.isMaterial && m.side !== undefined) m.side = THREE.DoubleSide;
+                        if (m && m.isMeshStandardMaterial) m.envMapIntensity = 1.0;
                     });
                 }
-            });
-            clearMatCache();
-            meshRecords.clear();
-            currentModel = null;
-            panelEl.classList.remove('visible');
-            toggleEl.classList.remove('visible');
-            setActiveButton('normal');
-            activeEffect = 'normal';
-            effectMix = 0;
+                meshRecords.set(node, { original: node.material, effect: null });
+            }
+        });
+        modelGroup.add(object);
+        fitModelToView(object);
+        updateInfo();
+        showStatus('Done');
+        panelEl.classList.add('visible');
+        toggleEl.classList.remove('visible');
+        setActiveButton('normal');
+        activeEffect = 'normal';
+        effectMix = 0;
+        needsRender = true;
+        if (animations.length > 0) setupAnimations();
+    }
+
+    function setupAnimations() {
+        mixer = new THREE.AnimationMixer(currentModel);
+        animSelect.innerHTML = '';
+        animations.forEach((clip, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = clip.name || ('Clip ' + (i + 1));
+            animSelect.appendChild(opt);
+        });
+        animBar.classList.add('visible');
+        playAnimation(0);
+    }
+    function playAnimation(index) {
+        if (!mixer || !animations[index]) return;
+        if (currentAction) currentAction.stop();
+        currentAction = mixer.clipAction(animations[index]);
+        currentAction.reset();
+        currentAction.play();
+        animPlaying = true;
+        animPlay.textContent = '⏸';
+    }
+    function stopAnimations() {
+        if (mixer) { mixer.stopAllAction(); mixer = null; }
+        currentAction = null;
+        animations = [];
+        animPlaying = false;
+        animBar.classList.remove('visible');
+    }
+    function togglePlay() {
+        if (!currentAction) return;
+        animPlaying = !animPlaying;
+        currentAction.paused = !animPlaying;
+        animPlay.textContent = animPlaying ? '⏸' : '▶';
+    }
+
+    let activeEffect = 'normal';
+    let effectMix = 0;
+    let effectTime = 0;
+    let needsRender = true;
+
+    function setActiveButton(name) {
+        document.querySelectorAll('.effect-btn[data-effect]').forEach(btn => btn.classList.toggle('active', btn.dataset.effect === name));
+    }
+
+    function applyEffect(name) {
+        if (!currentModel) return;
+        activeEffect = name;
+        effectMix = 0;
+        effectTime = 0;
+        const factory = EFFECT_FACTORIES[name];
+        meshRecords.forEach((record, mesh) => {
+            record.effect = null;
+            if (!factory) { mesh.material = record.original; return; }
+            const origMats = Array.isArray(record.original) ? record.original : [record.original];
+            const newMats = origMats.map(orig => getCachedMaterial(name, orig, factory));
+            record.effect = Array.isArray(record.original) ? newMats : newMats[0];
+            mesh.material = record.effect;
+        });
+        effectUniforms.uMix.value = 0;
+        needsRender = true;
+    }
+
+    function updateEffectMix(dt) {
+        effectTime += dt;
+        effectUniforms.uTime.value = effectTime;
+        if (effectMix < 1) {
+            effectMix = Math.min(1, effectMix + dt * 2.5);
+            effectUniforms.uMix.value = effectMix;
+        }
+    }
+
+    document.querySelectorAll('.effect-btn[data-effect]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const name = btn.dataset.effect;
+            if (name === activeEffect) return;
+            applyEffect(name);
+            setActiveButton(name);
+            showStatus('Effect: ' + btn.textContent.trim());
+        });
+    });
+
+    document.getElementById('hide-panel').addEventListener('click', () => {
+        panelEl.classList.remove('visible');
+        toggleEl.classList.add('visible');
+    });
+    toggleEl.addEventListener('click', () => {
+        panelEl.classList.add('visible');
+        toggleEl.classList.remove('visible');
+    });
+
+    let dragCounter = 0;
+    window.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; overlay.classList.add('active'); });
+    window.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    window.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter <= 0) { dragCounter = 0; overlay.classList.remove('active'); } });
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter = 0;
+        overlay.classList.remove('active');
+        const file = e.dataTransfer.files[0];
+        if (file) handleFile(file);
+    });
+
+    controls.addEventListener('change', () => { needsRender = true; });
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+
+    const ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
+    ssaoPass.kernelRadius = 8;
+    ssaoPass.minDistance = 0.005;
+    ssaoPass.maxDistance = 0.1;
+    ssaoPass.enabled = false;
+    composer.addPass(ssaoPass);
+
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.4, 0.85);
+    bloomPass.enabled = false;
+    composer.addPass(bloomPass);
+
+    const vignetteShader = {
+        uniforms: { tDiffuse: { value: null }, offset: { value: 1.0 }, darkness: { value: 0.6 } },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform sampler2D tDiffuse; uniform float offset; uniform float darkness; varying vec2 vUv; void main() { vec4 texel = texture2D(tDiffuse, vUv); vec2 uv = (vUv - vec2(0.5)) * vec2(offset); float vignette = 1.0 - dot(uv, uv); vignette = clamp(pow(vignette, darkness * 2.0), 0.0, 1.0); gl_FragColor = vec4(texel.rgb * vignette, texel.a); }'
+    };
+    const vignettePass = new ShaderPass(vignetteShader);
+    vignettePass.enabled = false;
+    composer.addPass(vignettePass);
+
+    let bloomEnabled = false, ssaoEnabled = false, vignetteEnabled = false;
+    let useComposer = false;
+
+    function updateComposerState() {
+        useComposer = bloomEnabled || ssaoEnabled || vignetteEnabled;
+        bloomPass.enabled = bloomEnabled;
+        ssaoPass.enabled = ssaoEnabled;
+        vignettePass.enabled = vignetteEnabled;
+        needsRender = true;
+    }
+
+    const bgColors = { black: new THREE.Color(0x000000), gray: new THREE.Color(0x333333) };
+    let gradientTexture = null;
+    function makeGradientTexture() {
+        const c = document.createElement('canvas');
+        c.width = 2; c.height = 512;
+        const ctx = c.getContext('2d');
+        const g = ctx.createLinearGradient(0, 0, 0, 512);
+        g.addColorStop(0, '#1a2332');
+        g.addColorStop(0.5, '#2a3548');
+        g.addColorStop(1, '#0a0f18');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 2, 512);
+        const tex = new THREE.CanvasTexture(c);
+        tex.encoding = THREE.sRGBEncoding;
+        return tex;
+    }
+
+    function setBackground(name) {
+        document.querySelectorAll('[data-bg]').forEach(b => b.classList.toggle('active', b.dataset.bg === name));
+        stars.visible = false;
+        if (name === 'gradient') {
+            if (!gradientTexture) gradientTexture = makeGradientTexture();
+            scene.background = gradientTexture;
+        } else if (name === 'stars') {
+            scene.background = bgColors.black;
+            stars.visible = true;
+        } else {
+            scene.background = bgColors[name] || bgColors.black;
+        }
+        needsRender = true;
+    }
+
+    document.querySelectorAll('[data-bg]').forEach(b => b.addEventListener('click', () => setBackground(b.dataset.bg)));
+
+    document.getElementById('btn-bloom').addEventListener('click', (e) => {
+        bloomEnabled = !bloomEnabled;
+        e.currentTarget.classList.toggle('active', bloomEnabled);
+        updateComposerState();
+    });
+    document.getElementById('btn-ssao').addEventListener('click', (e) => {
+        ssaoEnabled = !ssaoEnabled;
+        e.currentTarget.classList.toggle('active', ssaoEnabled);
+        updateComposerState();
+    });
+    document.getElementById('btn-vignette').addEventListener('click', (e) => {
+        vignetteEnabled = !vignetteEnabled;
+        e.currentTarget.classList.toggle('active', vignetteEnabled);
+        updateComposerState();
+    });
+
+    const btnShadows = document.getElementById('btn-shadows');
+    btnShadows.addEventListener('click', () => {
+        renderer.shadowMap.enabled = !renderer.shadowMap.enabled;
+        keyLight.castShadow = renderer.shadowMap.enabled;
+        btnShadows.classList.toggle('active', renderer.shadowMap.enabled);
+        meshRecords.forEach((r, mesh) => {
+            mesh.castShadow = renderer.shadowMap.enabled;
+            mesh.receiveShadow = renderer.shadowMap.enabled;
+        });
+        needsRender = true;
+    });
+
+    document.getElementById('exposure').addEventListener('input', (e) => {
+        renderer.toneMappingExposure = parseFloat(e.target.value);
+        needsRender = true;
+    });
+
+    animSelect.addEventListener('change', () => { playAnimation(parseInt(animSelect.value)); });
+    animPlay.addEventListener('click', togglePlay);
+    animSlider.addEventListener('input', () => {
+        if (!currentAction) return;
+        const clip = currentAction.getClip();
+        const t = (parseInt(animSlider.value) / 1000) * clip.duration;
+        currentAction.time = t;
+        if (mixer) mixer.update(0);
+        animTime.textContent = t.toFixed(2) + 's';
+        needsRender = true;
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === ' ' && currentAction) { e.preventDefault(); togglePlay(); }
+    });
+
+    const clock = new THREE.Clock();
+    let fpsAccum = 0, fpsFrames = 0;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        if (mixer) {
+            mixer.update(dt);
+            if (currentAction) {
+                const clip = currentAction.getClip();
+                animSlider.value = Math.min(1000, (currentAction.time / clip.duration) * 1000);
+                animTime.textContent = currentAction.time.toFixed(2) + 's';
+            }
             needsRender = true;
         }
 
-        function fitModelToView(object) {
-            const box = new THREE.Box3().setFromObject(object);
-            const size = box.getSize(new THREE.Vector3());
-            const center = box.getCenter(new THREE.Vector3());
-
-            object.position.sub(center);
-
-            const maxDim = Math.max(size.x, size.y, size.z);
-            if (maxDim > 0) {
-                const scale = 2.5 / maxDim;
-                object.scale.multiplyScalar(scale);
-            }
-
-            const newSize = size.clone().multiplyScalar(object.scale.x);
-            const newCenter = new THREE.Vector3(0, 0, 0);
-
-            controls.target.copy(newCenter);
-
-            const dist = Math.max(newSize.x, newSize.y, newSize.z) * 1.9;
-            const dir = new THREE.Vector3(1, 0.8, 1).normalize();
-            camera.position.copy(newCenter.clone().add(dir.multiplyScalar(dist)));
-            camera.near = Math.max(0.001, dist / 1000);
-            camera.far = dist * 100;
-            camera.updateProjectionMatrix();
-
-            controls.update();
+        if (activeEffect === 'hologram' || effectMix < 1) {
+            updateEffectMix(dt);
             needsRender = true;
+        } else {
+            effectUniforms.uTime.value += dt;
         }
 
-        function handleFile(file) {
-            if (!file) return;
+        if (controls.update()) needsRender = true;
 
-            hintEl.classList.add('hidden');
-            showStatus('Loading: ' + file.name);
-            clearModel();
+        fpsAccum += dt; fpsFrames++;
+        if (fpsAccum >= 0.5) { fpsEl.textContent = Math.round(fpsFrames / fpsAccum) + ' fps'; fpsAccum = 0; fpsFrames = 0; }
 
-            const ext = file.name.split('.').pop().toLowerCase();
-            const reader = new FileReader();
-
-            const binaryFormats = ['glb', 'stl', 'ply', '3mf', 'amf', 'fbx', 'dae'];
-
-            reader.onload = (e) => {
-                const data = e.target.result;
-                try {
-                    loadByExtension(ext, data);
-                } catch (err) {
-                    console.error(err);
-                    showStatus('Error: ' + err.message, true);
-                }
-            };
-
-            reader.onerror = () => showStatus('Failed to read file', true);
-
-            if (binaryFormats.includes(ext)) {
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.readAsText(file);
-            }
+        if (needsRender) {
+            if (useComposer) composer.render();
+            else renderer.render(scene, camera);
+            needsRender = false;
         }
+    }
+    animate();
 
-        function loadByExtension(ext, data) {
-            switch (ext) {
-                case 'glb':
-                case 'gltf':
-                    gltfLoader.parse(data, '', (gltf) => {
-                        currentModel = gltf.scene;
-                        postProcessAndAdd(currentModel);
-                    }, (err) => {
-                        console.error(err);
-                        showStatus('GLB/GLTF error: ' + err.message, true);
-                    });
-                    break;
-
-                case 'fbx':
-                    currentModel = fbxLoader.parse(data);
-                    postProcessAndAdd(currentModel);
-                    break;
-
-                case 'obj':
-                    currentModel = objLoader.parse(data);
-                    postProcessAndAdd(currentModel);
-                    break;
-
-                case 'stl':
-                    const stlGeo = stlLoader.parse(data);
-                    currentModel = new THREE.Mesh(stlGeo, defaultMat());
-                    postProcessAndAdd(currentModel);
-                    break;
-
-                case 'ply':
-                    const plyGeo = plyLoader.parse(data);
-                    currentModel = new THREE.Mesh(plyGeo, defaultMat());
-                    postProcessAndAdd(currentModel);
-                    break;
-
-                case 'dae':
-                    const collada = colladaLoader.parse(data);
-                    currentModel = collada.scene;
-                    postProcessAndAdd(currentModel);
-                    break;
-
-                case '3mf':
-                    threeMFLoader.parse(data, (obj) => {
-                        currentModel = obj;
-                        postProcessAndAdd(currentModel);
-                    }, (err) => {
-                        console.error(err);
-                        showStatus('3MF error: ' + err.message, true);
-                    });
-                    break;
-
-                case 'amf':
-                    amfLoader.parse(data, (obj) => {
-                        currentModel = obj;
-                        postProcessAndAdd(currentModel);
-                    }, (err) => {
-                        console.error(err);
-                        showStatus('AMF error: ' + err.message, true);
-                    });
-                    break;
-
-                default:
-                    try {
-                        gltfLoader.parse(data, '', (gltf) => {
-                            currentModel = gltf.scene;
-                            postProcessAndAdd(currentModel);
-                        }, () => {
-                            showStatus('.' + ext + ' format is not supported', true);
-                        });
-                    } catch {
-                        showStatus('.' + ext + ' format is not supported', true);
-                    }
-            }
-        }
-
-        function defaultMat() {
-            return new THREE.MeshLambertMaterial({
-                color: 0xb0b0b0,
-                side: THREE.FrontSide
-            });
-        }
-
-        function postProcessAndAdd(object) {
-            object.traverse((node) => {
-                if (node.isMesh) {
-                    node.castShadow = false;
-                    node.receiveShadow = false;
-                    node.frustumCulled = true;
-                    if (node.geometry) {
-                        node.geometry.computeBoundingSphere();
-                    }
-                    if (node.material) {
-                        const mats = Array.isArray(node.material) ? node.material : [node.material];
-                        mats.forEach(m => {
-                            if (m && m.isMaterial && m.side !== undefined) {
-                                m.side = THREE.DoubleSide;
-                            }
-                        });
-                    }
-                    meshRecords.set(node, {
-                        original: node.material,
-                        effect: null
-                    });
-                }
-            });
-            modelGroup.add(object);
-            fitModelToView(object);
-            showStatus('Done');
-
-            panelEl.classList.add('visible');
-            toggleEl.classList.remove('visible');
-
-            setActiveButton('normal');
-            activeEffect = 'normal';
-            effectMix = 0;
-            needsRender = true;
-        }
-
-        let activeEffect = 'normal';
-        let effectMix = 0;
-        let effectTime = 0;
-        let needsRender = true;
-
-        function setActiveButton(name) {
-            document.querySelectorAll('.effect-btn[data-effect]').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.effect === name);
-            });
-        }
-
-        function applyEffect(name) {
-            if (!currentModel) return;
-
-            activeEffect = name;
-            effectMix = 0;
-            effectTime = 0;
-
-            const factory = EFFECT_FACTORIES[name];
-
-            meshRecords.forEach((record, mesh) => {
-                record.effect = null;
-
-                if (!factory) {
-                    mesh.material = record.original;
-                    return;
-                }
-
-                const origMats = Array.isArray(record.original) ? record.original : [record.original];
-                const newMats = origMats.map(orig => getCachedMaterial(name, orig, factory));
-
-                record.effect = Array.isArray(record.original) ? newMats : newMats[0];
-                mesh.material = record.effect;
-            });
-
-            effectUniforms.uMix.value = 0;
-            needsRender = true;
-        }
-
-        function updateEffectMix(dt) {
-            effectTime += dt;
-            effectUniforms.uTime.value = effectTime;
-
-            if (effectMix < 1) {
-                effectMix = Math.min(1, effectMix + dt * 2.5);
-                effectUniforms.uMix.value = effectMix;
-            }
-        }
-
-        document.querySelectorAll('.effect-btn[data-effect]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const name = btn.dataset.effect;
-                if (name === activeEffect) return;
-                applyEffect(name);
-                setActiveButton(name);
-                showStatus('Effect: ' + btn.textContent.trim());
-            });
-        });
-
-        document.getElementById('hide-panel').addEventListener('click', () => {
-            panelEl.classList.remove('visible');
-            toggleEl.classList.add('visible');
-        });
-        toggleEl.addEventListener('click', () => {
-            panelEl.classList.add('visible');
-            toggleEl.classList.remove('visible');
-        });
-
-        let dragCounter = 0;
-
-        window.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            dragCounter++;
-            overlay.classList.add('active');
-        });
-
-        window.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
-
-        window.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dragCounter--;
-            if (dragCounter <= 0) {
-                dragCounter = 0;
-                overlay.classList.remove('active');
-            }
-        });
-
-        window.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dragCounter = 0;
-            overlay.classList.remove('active');
-
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
-        });
-
-        controls.addEventListener('change', () => { needsRender = true; });
-
-        const clock = new THREE.Clock();
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const dt = Math.min(clock.getDelta(), 0.05);
-
-            if (activeEffect === 'hologram') {
-                updateEffectMix(dt);
-                needsRender = true;
-            } else if (effectMix < 1) {
-                updateEffectMix(dt);
-                needsRender = true;
-            } else {
-                effectUniforms.uTime.value += dt;
-            }
-
-            const controlsChanged = controls.update();
-            if (controlsChanged) needsRender = true;
-
-            if (needsRender) {
-                renderer.render(scene, camera);
-                needsRender = false;
-            }
-        }
-        animate();
-
-        window.addEventListener('resize', () => {
-            camera.aspect = innerWidth / innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(innerWidth, innerHeight);
-            needsRender = true;
-        });
+    window.addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+        composer.setSize(innerWidth, innerHeight);
+        needsRender = true;
+    });
     </script>
 </body>
 </html>
