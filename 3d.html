@@ -130,15 +130,15 @@
     </script>
 
     <script type="module">
-    const statusEl = document.getElementById('status');
-    function fatal(msg) {
-        statusEl.textContent = msg;
-        statusEl.style.color = '#ff6b6b';
-        statusEl.classList.add('show');
+    const statusLine = document.getElementById('status');
+    function reportFatal(msg) {
+        statusLine.textContent = msg;
+        statusLine.style.color = '#ff6b6b';
+        statusLine.classList.add('show');
         console.error(msg);
     }
-    window.addEventListener('error', (e) => fatal('JS Error: ' + (e.message || 'unknown')));
-    window.addEventListener('unhandledrejection', (e) => fatal('Promise Error: ' + (e.reason && e.reason.message || e.reason)));
+    window.addEventListener('error', (ev) => reportFatal('JS Error: ' + (ev.message || 'unknown')));
+    window.addEventListener('unhandledrejection', (ev) => reportFatal('Promise Error: ' + (ev.reason && ev.reason.message || ev.reason)));
 
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -164,7 +164,7 @@
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 10000);
     camera.position.set(0, 2, 5);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(innerWidth, innerHeight);
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     renderer.outputEncoding = THREE.sRGBEncoding;
@@ -187,14 +187,14 @@
 
     scene.add(new THREE.AmbientLight(0x505050, 1.2));
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    keyLight.position.set(3, 6, 4);
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
-    keyLight.shadow.camera.near = 0.5;
-    keyLight.shadow.camera.far = 500;
-    keyLight.shadow.bias = -0.0005;
-    scene.add(keyLight);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    mainLight.position.set(3, 6, 4);
+    mainLight.shadow.mapSize.width = 2048;
+    mainLight.shadow.mapSize.height = 2048;
+    mainLight.shadow.camera.near = 0.5;
+    mainLight.shadow.camera.far = 500;
+    mainLight.shadow.bias = -0.0005;
+    scene.add(mainLight);
 
     const rimLight = new THREE.DirectionalLight(0xffddaa, 0.9);
     rimLight.position.set(-4, 3, -5);
@@ -203,9 +203,9 @@
     const fillLight = new THREE.PointLight(0xaaaaaa, 0.6);
     fillLight.position.set(0, 4, 3);
     scene.add(fillLight);
-    const topLight = new THREE.PointLight(0xffffff, 0.5);
-    topLight.position.set(0, 12, 0);
-    scene.add(topLight);
+    const overheadLight = new THREE.PointLight(0xffffff, 0.5);
+    overheadLight.position.set(0, 12, 0);
+    scene.add(overheadLight);
 
     const grid = new THREE.GridHelper(20, 20, 0x888888, 0x444444);
     grid.position.y = -0.5;
@@ -213,29 +213,29 @@
     grid.material.opacity = 0.3;
     scene.add(grid);
 
-    const starGeo = new THREE.BufferGeometry();
-    const starCount = 1500;
-    const starPos = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount * 3; i += 3) {
-        starPos[i] = (Math.random() - 0.5) * 3000;
-        starPos[i+1] = (Math.random() - 0.5) * 3000;
-        starPos[i+2] = (Math.random() - 0.5) * 3000;
+    const starGeometry = new THREE.BufferGeometry();
+    const starTotal = 1500;
+    const starPositions = new Float32Array(starTotal * 3);
+    for (let i = 0; i < starTotal * 3; i += 3) {
+        starPositions[i] = (Math.random() - 0.5) * 3000;
+        starPositions[i + 1] = (Math.random() - 0.5) * 3000;
+        starPositions[i + 2] = (Math.random() - 0.5) * 3000;
     }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, transparent: true, opacity: 0.3, depthWrite: false, sizeAttenuation: false }));
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, transparent: true, opacity: 0.3, depthWrite: false, sizeAttenuation: false }));
     stars.frustumCulled = false;
     stars.visible = false;
     scene.add(stars);
 
-    const modelGroup = new THREE.Group();
-    scene.add(modelGroup);
-    let currentModel = null;
+    const modelRoot = new THREE.Group();
+    scene.add(modelRoot);
+    let loadedModel = null;
 
-    const draco = new DRACOLoader();
-    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.1/');
 
     const gltfLoader = new GLTFLoader();
-    gltfLoader.setDRACOLoader(draco);
+    gltfLoader.setDRACOLoader(dracoLoader);
     gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
     const fbxLoader = new FBXLoader();
@@ -246,68 +246,69 @@
     const threeMFLoader = new ThreeMFLoader();
     const amfLoader = new AMFLoader();
 
-    const overlay = document.getElementById('drop-overlay');
-    const hintEl = document.getElementById('hint');
-    const panelEl = document.getElementById('effects-panel');
-    const toggleEl = document.getElementById('effects-toggle');
-    const infoEl = document.getElementById('info');
-    const fpsEl = document.getElementById('fps');
-    const progressEl = document.getElementById('progress');
-    const toastEl = document.getElementById('toast');
+    const dropOverlay = document.getElementById('drop-overlay');
+    const hint = document.getElementById('hint');
+    const effectsPanel = document.getElementById('effects-panel');
+    const panelToggle = document.getElementById('effects-toggle');
+    const statsPanel = document.getElementById('info');
+    const fpsBadge = document.getElementById('fps');
+    const loadBar = document.getElementById('progress');
+    const toast = document.getElementById('toast');
     const animBar = document.getElementById('animation-bar');
     const animSelect = document.getElementById('anim-select');
-    const animSlider = document.getElementById('anim-slider');
-    const animPlay = document.getElementById('anim-play');
-    const animTime = document.getElementById('anim-time');
+    const animScrub = document.getElementById('anim-slider');
+    const animToggle = document.getElementById('anim-play');
+    const animClock = document.getElementById('anim-time');
 
     let toastTimer = null;
-    function showStatus(msg, isError = false) {
-        statusEl.textContent = msg;
-        statusEl.style.color = isError ? '#ff6b6b' : '#ffaa00';
-        statusEl.classList.add('show');
+    let statusTimer = null;
+    function flashStatus(msg, isError = false) {
+        statusLine.textContent = msg;
+        statusLine.style.color = isError ? '#ff6b6b' : '#ffaa00';
+        statusLine.classList.add('show');
         if (!isError) {
-            clearTimeout(showStatus._t);
-            showStatus._t = setTimeout(() => statusEl.classList.remove('show'), 2500);
+            clearTimeout(statusTimer);
+            statusTimer = setTimeout(() => statusLine.classList.remove('show'), 2500);
         }
     }
-    function showToast(msg, dur = 1800) {
-        toastEl.textContent = msg;
-        toastEl.classList.add('visible');
+    function flashToast(msg, dur = 1800) {
+        toast.textContent = msg;
+        toast.classList.add('visible');
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => toastEl.classList.remove('visible'), dur);
+        toastTimer = setTimeout(() => toast.classList.remove('visible'), dur);
     }
 
-    const effectUniforms = { uMix: { value: 0 }, uTime: { value: 0 } };
-    const matCache = new Map();
+    const fxUniforms = { uMix: { value: 0 }, uTime: { value: 0 } };
+    const materialCache = new Map();
 
-    function materialKey(effect, orig) {
+    function cacheKey(effect, orig) {
         const mapId = orig.map ? orig.map.uuid : '';
         const colorId = orig.color ? orig.color.getHexString() : 'ffffff';
         const roughId = orig.roughness !== undefined ? orig.roughness.toFixed(2) : '0.5';
         const metalId = orig.metalness !== undefined ? orig.metalness.toFixed(2) : '0.0';
         return effect + '|' + mapId + '|' + colorId + '|' + roughId + '|' + metalId;
     }
-    function getCachedMaterial(effect, orig, factory) {
-        const key = materialKey(effect, orig);
-        let m = matCache.get(key);
-        if (m === undefined) { m = factory(orig); matCache.set(key, m); }
+    function cachedMaterial(effect, orig, factory) {
+        const key = cacheKey(effect, orig);
+        let m = materialCache.get(key);
+        if (m === undefined) { m = factory(orig); materialCache.set(key, m); }
         return m;
     }
-    function clearMatCache() {
-        matCache.forEach(m => {
+    function purgeMaterialCache() {
+        materialCache.forEach(m => {
             if (m && m.dispose) {
                 for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); }
                 m.dispose();
             }
         });
-        matCache.clear();
+        materialCache.clear();
     }
 
-    function makeHologramMat() {
+    function buildHologramMaterial() {
         const m = new THREE.MeshLambertMaterial({ color: 0x66ffcc, emissive: 0x00ffaa, emissiveIntensity: 1.4, transparent: true, opacity: 0.45, side: THREE.FrontSide });
         m.onBeforeCompile = (shader) => {
-            shader.uniforms.uMix = effectUniforms.uMix;
-            shader.uniforms.uTime = effectUniforms.uTime;
+            shader.uniforms.uMix = fxUniforms.uMix;
+            shader.uniforms.uTime = fxUniforms.uTime;
             shader.vertexShader = 'varying vec3 vWorldPos;\nvarying vec3 vNormalW;\n' + shader.vertexShader.replace(
                 '#include <worldpos_vertex>',
                 '#include <worldpos_vertex>\n vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vNormalW = normalize(mat3(modelMatrix) * objectNormal);'
@@ -326,10 +327,10 @@
         };
         return m;
     }
-    const makeGrayMat = () => new THREE.MeshLambertMaterial({ color: 0xb0b0b0, side: THREE.FrontSide });
-    const makeNormalsMat = () => new THREE.MeshNormalMaterial({ side: THREE.FrontSide });
-    const makeUnlitMat = (orig) => new THREE.MeshBasicMaterial({ map: orig.map || null, color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff), side: THREE.FrontSide });
-    function makeCartoonMat(orig) {
+    const buildGrayMaterial = () => new THREE.MeshLambertMaterial({ color: 0xb0b0b0, side: THREE.FrontSide });
+    const buildNormalsMaterial = () => new THREE.MeshNormalMaterial({ side: THREE.FrontSide });
+    const buildUnlitMaterial = (orig) => new THREE.MeshBasicMaterial({ map: orig.map || null, color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff), side: THREE.FrontSide });
+    function buildCartoonMaterial(orig) {
         const m = new THREE.MeshStandardMaterial({ color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff), map: orig.map || null, roughness: 0.7, metalness: 0.0, side: THREE.DoubleSide });
         m.onBeforeCompile = (shader) => {
             shader.vertexShader = 'varying vec3 vNormalW;\nvarying vec3 vViewDir;\n' + shader.vertexShader.replace(
@@ -343,7 +344,7 @@
         };
         return m;
     }
-    function makeSketchMat() {
+    function buildSketchMaterial() {
         const m = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.FrontSide });
         m.onBeforeCompile = (shader) => {
             shader.vertexShader = 'varying vec3 vNormalW;\nvarying vec3 vViewDir;\nvarying vec3 vWorldPos;\n' + shader.vertexShader.replace(
@@ -366,22 +367,28 @@
         };
         return m;
     }
-    const makeXRayMat = () => new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false });
-    const makeChromeMat = () => new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.5 });
+    const buildXRayMaterial = () => new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false });
+    const buildChromeMaterial = () => new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.5 });
 
-    const EFFECT_FACTORIES = {
-        normal: null, gray: makeGrayMat, normals: makeNormalsMat, unlit: makeUnlitMat,
-        cartoon: makeCartoonMat, sketch: makeSketchMat, xray: makeXRayMat,
-        chrome: makeChromeMat, hologram: makeHologramMat
+    const effectBuilders = {
+        normal: null,
+        gray: buildGrayMaterial,
+        normals: buildNormalsMaterial,
+        unlit: buildUnlitMaterial,
+        cartoon: buildCartoonMaterial,
+        sketch: buildSketchMaterial,
+        xray: buildXRayMaterial,
+        chrome: buildChromeMaterial,
+        hologram: buildHologramMaterial
     };
 
-    const meshRecords = new Map();
+    const meshState = new Map();
 
-    function clearModel() {
-        if (!currentModel) return;
-        stopAnimations();
-        modelGroup.remove(currentModel);
-        currentModel.traverse((node) => {
+    function disposeModel() {
+        if (!loadedModel) return;
+        haltAnimations();
+        modelRoot.remove(loadedModel);
+        loadedModel.traverse((node) => {
             if (node.geometry) node.geometry.dispose();
             if (node.material) {
                 const mats = Array.isArray(node.material) ? node.material : [node.material];
@@ -391,29 +398,29 @@
                 });
             }
         });
-        clearMatCache();
-        meshRecords.clear();
-        currentModel = null;
-        panelEl.classList.remove('visible');
-        toggleEl.classList.remove('visible');
-        infoEl.classList.remove('visible');
+        purgeMaterialCache();
+        meshState.clear();
+        loadedModel = null;
+        effectsPanel.classList.remove('visible');
+        panelToggle.classList.remove('visible');
+        statsPanel.classList.remove('visible');
         animBar.classList.remove('visible');
-        setActiveButton('normal');
-        activeEffect = 'normal';
-        effectMix = 0;
-        needsRender = true;
+        markEffectButton('normal');
+        currentEffect = 'normal';
+        mixAmount = 0;
+        renderPending = true;
     }
 
-    function fitModelToView(object) {
+    function frameModel(object) {
         const box = new THREE.Box3().setFromObject(object);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         object.position.sub(center);
         const maxDim = Math.max(size.x, size.y, size.z);
         if (maxDim > 0) object.scale.multiplyScalar(2.5 / maxDim);
-        const newSize = size.clone().multiplyScalar(object.scale.x);
+        const scaledSize = size.clone().multiplyScalar(object.scale.x);
         controls.target.set(0, 0, 0);
-        const dist = Math.max(newSize.x, newSize.y, newSize.z) * 1.9;
+        const dist = Math.max(scaledSize.x, scaledSize.y, scaledSize.z) * 1.9;
         const dir = new THREE.Vector3(1, 0.8, 1).normalize();
         camera.position.copy(dir.multiplyScalar(dist));
         camera.near = Math.max(0.001, dist / 1000);
@@ -421,14 +428,14 @@
         camera.updateProjectionMatrix();
         grid.position.y = box.min.y * object.scale.x + object.position.y;
         controls.update();
-        needsRender = true;
+        renderPending = true;
     }
 
-    function updateInfo() {
-        if (!currentModel) { infoEl.classList.remove('visible'); return; }
+    function refreshStats() {
+        if (!loadedModel) { statsPanel.classList.remove('visible'); return; }
         let meshes = 0, tris = 0, verts = 0;
         const mats = new Set(), texs = new Set();
-        currentModel.traverse(n => {
+        loadedModel.traverse(n => {
             if (n.isMesh) {
                 meshes++;
                 if (n.geometry) {
@@ -442,101 +449,120 @@
                 }
             }
         });
-        infoEl.innerHTML = '<div><span class="k">Meshes:</span><span class="v">' + meshes + '</span></div>' +
+        statsPanel.innerHTML = '<div><span class="k">Meshes:</span><span class="v">' + meshes + '</span></div>' +
             '<div><span class="k">Vertices:</span><span class="v">' + verts.toLocaleString() + '</span></div>' +
             '<div><span class="k">Triangles:</span><span class="v">' + Math.round(tris).toLocaleString() + '</span></div>' +
             '<div><span class="k">Materials:</span><span class="v">' + mats.size + '</span></div>' +
             '<div><span class="k">Textures:</span><span class="v">' + texs.size + '</span></div>';
-        infoEl.classList.add('visible');
+        statsPanel.classList.add('visible');
     }
 
-    function handleFile(file) {
+    function ingestFile(file) {
         if (!file) return;
-        hintEl.classList.add('hidden');
-        showStatus('Loading: ' + file.name);
-        clearModel();
+        hint.classList.add('hidden');
+        flashStatus('Loading: ' + file.name);
+        disposeModel();
         const ext = file.name.split('.').pop().toLowerCase();
-        const binaryFormats = ['glb', 'stl', 'ply', '3mf', 'amf', 'fbx', 'dae'];
-        const isBinary = binaryFormats.includes(ext);
-        progressEl.classList.add('visible');
-        progressEl.style.width = '0%';
-        const reader = new FileReader();
-        reader.onprogress = (e) => { if (e.lengthComputable) progressEl.style.width = (e.loaded / e.total * 100) + '%'; };
-        reader.onload = (e) => {
-            progressEl.style.width = '100%';
-            setTimeout(() => progressEl.classList.remove('visible'), 300);
-            try { loadByExtension(ext, e.target.result, file.name); }
-            catch (err) { console.error(err); showStatus('Error: ' + err.message, true); }
+        const binaryExtensions = ['glb', 'stl', 'ply', '3mf', 'amf'];
+        const textExtensions = ['gltf', 'obj', 'dae'];
+        const fileReader = new FileReader();
+        loadBar.classList.add('visible');
+        loadBar.style.width = '0%';
+        fileReader.onprogress = (ev) => { if (ev.lengthComputable) loadBar.style.width = (ev.loaded / ev.total * 100) + '%'; };
+        fileReader.onload = (ev) => {
+            loadBar.style.width = '100%';
+            setTimeout(() => loadBar.classList.remove('visible'), 300);
+            try { parseByExtension(ext, ev.target.result, file.name); }
+            catch (err) { console.error(err); flashStatus('Error: ' + err.message, true); }
         };
-        reader.onerror = () => showStatus('Failed to read file', true);
-        if (isBinary) reader.readAsArrayBuffer(file);
-        else reader.readAsText(file);
+        fileReader.onerror = () => flashStatus('Failed to read file', true);
+        if (binaryExtensions.includes(ext)) {
+            fileReader.readAsArrayBuffer(file);
+        } else if (ext === 'fbx') {
+            fileReader.readAsArrayBuffer(file);
+        } else if (textExtensions.includes(ext)) {
+            fileReader.readAsText(file);
+        } else {
+            flashStatus('.' + ext + ' format is not supported', true);
+        }
     }
 
-    function loadByExtension(ext, data, sourceName) {
-        const basePath = sourceName && sourceName.includes('/') ? sourceName.substring(0, sourceName.lastIndexOf('/') + 1) : '';
+    function parseByExtension(ext, data, sourceName) {
+        const assetBase = sourceName && sourceName.includes('/') ? sourceName.substring(0, sourceName.lastIndexOf('/') + 1) : '';
         switch (ext) {
             case 'glb': case 'gltf':
-                gltfLoader.parse(data, basePath, (gltf) => {
-                    currentModel = gltf.scene;
-                    animations = gltf.animations || [];
-                    postProcessAndAdd(currentModel);
-                }, (err) => { console.error(err); showStatus('GLB/GLTF error: ' + err.message, true); });
+                gltfLoader.parse(data, assetBase, (gltf) => {
+                    loadedModel = gltf.scene;
+                    clips = gltf.animations || [];
+                    finalizeModel(loadedModel);
+                }, (err) => { console.error(err); flashStatus('GLB/GLTF error: ' + err.message, true); });
                 break;
-            case 'fbx':
-                currentModel = fbxLoader.parse(data, basePath);
-                animations = currentModel.animations || [];
-                postProcessAndAdd(currentModel);
+            case 'fbx': {
+                let fbxResult;
+                try {
+                    fbxResult = fbxLoader.parse(data, assetBase);
+                } catch (err) {
+                    const text = new TextDecoder('utf-8', { fatal: false }).decode(data);
+                    if (text.startsWith('Kaydara FBX Binary')) {
+                        flashStatus('Binary FBX could not be parsed', true);
+                        return;
+                    }
+                    fbxResult = fbxLoader.parse(text, assetBase);
+                }
+                loadedModel = fbxResult;
+                clips = loadedModel.animations || [];
+                finalizeModel(loadedModel);
                 break;
+            }
             case 'obj':
-                currentModel = objLoader.parse(data);
-                animations = [];
-                postProcessAndAdd(currentModel);
+                loadedModel = objLoader.parse(data);
+                clips = [];
+                finalizeModel(loadedModel);
                 break;
             case 'stl': {
                 const g = stlLoader.parse(data);
                 g.computeVertexNormals();
-                currentModel = new THREE.Mesh(g, defaultMat());
-                animations = [];
-                postProcessAndAdd(currentModel);
+                loadedModel = new THREE.Mesh(g, defaultMaterial());
+                clips = [];
+                finalizeModel(loadedModel);
                 break;
             }
             case 'ply': {
                 const g = plyLoader.parse(data);
                 g.computeVertexNormals();
-                currentModel = new THREE.Mesh(g, defaultMat());
-                animations = [];
-                postProcessAndAdd(currentModel);
+                loadedModel = new THREE.Mesh(g, defaultMaterial());
+                clips = [];
+                finalizeModel(loadedModel);
                 break;
             }
             case 'dae': {
-                const c = colladaLoader.parse(data, basePath);
-                currentModel = c.scene;
-                animations = c.animations || [];
-                postProcessAndAdd(currentModel);
+                const c = colladaLoader.parse(data, assetBase);
+                loadedModel = c.scene;
+                clips = c.animations || [];
+                finalizeModel(loadedModel);
                 break;
             }
             case '3mf':
-                threeMFLoader.parse(data, (obj) => { currentModel = obj; animations = []; postProcessAndAdd(currentModel); },
-                    (err) => { console.error(err); showStatus('3MF error: ' + err.message, true); });
+                threeMFLoader.parse(data, (obj) => { loadedModel = obj; clips = []; finalizeModel(loadedModel); },
+                    (err) => { console.error(err); flashStatus('3MF error: ' + err.message, true); });
                 break;
             case 'amf':
-                amfLoader.parse(data, (obj) => { currentModel = obj; animations = []; postProcessAndAdd(currentModel); },
-                    (err) => { console.error(err); showStatus('AMF error: ' + err.message, true); });
+                amfLoader.parse(data, (obj) => { loadedModel = obj; clips = []; finalizeModel(loadedModel); },
+                    (err) => { console.error(err); flashStatus('AMF error: ' + err.message, true); });
                 break;
             default:
-                showStatus('.' + ext + ' format is not supported', true);
+                flashStatus('.' + ext + ' format is not supported', true);
         }
     }
 
-    function defaultMat() { return new THREE.MeshLambertMaterial({ color: 0xb0b0b0, side: THREE.FrontSide }); }
+    function defaultMaterial() { return new THREE.MeshLambertMaterial({ color: 0xb0b0b0, side: THREE.FrontSide }); }
 
-    let animations = [];
+    let clips = [];
     let mixer = null;
-    let currentAction = null;
-    let animPlaying = false;
+    let activeAction = null;
+    let isPlaying = false;
 
-    function postProcessAndAdd(object) {
+    function finalizeModel(object) {
         object.traverse((node) => {
             if (node.isMesh) {
                 node.castShadow = false;
@@ -550,126 +576,126 @@
                         if (m && m.isMeshStandardMaterial) m.envMapIntensity = 1.0;
                     });
                 }
-                meshRecords.set(node, { original: node.material, effect: null });
+                meshState.set(node, { original: node.material, effect: null });
             }
         });
-        modelGroup.add(object);
-        fitModelToView(object);
-        updateInfo();
-        showStatus('Done');
-        panelEl.classList.add('visible');
-        toggleEl.classList.remove('visible');
-        setActiveButton('normal');
-        activeEffect = 'normal';
-        effectMix = 0;
-        needsRender = true;
-        if (animations.length > 0) setupAnimations();
+        modelRoot.add(object);
+        frameModel(object);
+        refreshStats();
+        flashStatus('Done');
+        effectsPanel.classList.add('visible');
+        panelToggle.classList.remove('visible');
+        markEffectButton('normal');
+        currentEffect = 'normal';
+        mixAmount = 0;
+        renderPending = true;
+        if (clips.length > 0) initAnimations();
     }
 
-    function setupAnimations() {
-        mixer = new THREE.AnimationMixer(currentModel);
+    function initAnimations() {
+        mixer = new THREE.AnimationMixer(loadedModel);
         animSelect.innerHTML = '';
-        animations.forEach((clip, i) => {
+        clips.forEach((clip, i) => {
             const opt = document.createElement('option');
             opt.value = i;
             opt.textContent = clip.name || ('Clip ' + (i + 1));
             animSelect.appendChild(opt);
         });
         animBar.classList.add('visible');
-        playAnimation(0);
+        startClip(0);
     }
-    function playAnimation(index) {
-        if (!mixer || !animations[index]) return;
-        if (currentAction) currentAction.stop();
-        currentAction = mixer.clipAction(animations[index]);
-        currentAction.reset();
-        currentAction.play();
-        animPlaying = true;
-        animPlay.textContent = '⏸';
+    function startClip(index) {
+        if (!mixer || !clips[index]) return;
+        if (activeAction) activeAction.stop();
+        activeAction = mixer.clipAction(clips[index]);
+        activeAction.reset();
+        activeAction.play();
+        isPlaying = true;
+        animToggle.textContent = '⏸';
     }
-    function stopAnimations() {
+    function haltAnimations() {
         if (mixer) { mixer.stopAllAction(); mixer = null; }
-        currentAction = null;
-        animations = [];
-        animPlaying = false;
+        activeAction = null;
+        clips = [];
+        isPlaying = false;
         animBar.classList.remove('visible');
     }
-    function togglePlay() {
-        if (!currentAction) return;
-        animPlaying = !animPlaying;
-        currentAction.paused = !animPlaying;
-        animPlay.textContent = animPlaying ? '⏸' : '▶';
+    function togglePlayback() {
+        if (!activeAction) return;
+        isPlaying = !isPlaying;
+        activeAction.paused = !isPlaying;
+        animToggle.textContent = isPlaying ? '⏸' : '▶';
     }
 
-    let activeEffect = 'normal';
-    let effectMix = 0;
-    let effectTime = 0;
-    let needsRender = true;
+    let currentEffect = 'normal';
+    let mixAmount = 0;
+    let fxClock = 0;
+    let renderPending = true;
 
-    function setActiveButton(name) {
+    function markEffectButton(name) {
         document.querySelectorAll('.effect-btn[data-effect]').forEach(btn => btn.classList.toggle('active', btn.dataset.effect === name));
     }
 
-    function applyEffect(name) {
-        if (!currentModel) return;
-        activeEffect = name;
-        effectMix = 0;
-        effectTime = 0;
-        const factory = EFFECT_FACTORIES[name];
-        meshRecords.forEach((record, mesh) => {
+    function switchEffect(name) {
+        if (!loadedModel) return;
+        currentEffect = name;
+        mixAmount = 0;
+        fxClock = 0;
+        const builder = effectBuilders[name];
+        meshState.forEach((record, mesh) => {
             record.effect = null;
-            if (!factory) { mesh.material = record.original; return; }
+            if (!builder) { mesh.material = record.original; return; }
             const origMats = Array.isArray(record.original) ? record.original : [record.original];
-            const newMats = origMats.map(orig => getCachedMaterial(name, orig, factory));
+            const newMats = origMats.map(orig => cachedMaterial(name, orig, builder));
             record.effect = Array.isArray(record.original) ? newMats : newMats[0];
             mesh.material = record.effect;
         });
-        effectUniforms.uMix.value = 0;
-        needsRender = true;
+        fxUniforms.uMix.value = 0;
+        renderPending = true;
     }
 
-    function updateEffectMix(dt) {
-        effectTime += dt;
-        effectUniforms.uTime.value = effectTime;
-        if (effectMix < 1) {
-            effectMix = Math.min(1, effectMix + dt * 2.5);
-            effectUniforms.uMix.value = effectMix;
+    function advanceMix(dt) {
+        fxClock += dt;
+        fxUniforms.uTime.value = fxClock;
+        if (mixAmount < 1) {
+            mixAmount = Math.min(1, mixAmount + dt * 2.5);
+            fxUniforms.uMix.value = mixAmount;
         }
     }
 
     document.querySelectorAll('.effect-btn[data-effect]').forEach(btn => {
         btn.addEventListener('click', () => {
             const name = btn.dataset.effect;
-            if (name === activeEffect) return;
-            applyEffect(name);
-            setActiveButton(name);
-            showStatus('Effect: ' + btn.textContent.trim());
+            if (name === currentEffect) return;
+            switchEffect(name);
+            markEffectButton(name);
+            flashStatus('Effect: ' + btn.textContent.trim());
         });
     });
 
     document.getElementById('hide-panel').addEventListener('click', () => {
-        panelEl.classList.remove('visible');
-        toggleEl.classList.add('visible');
+        effectsPanel.classList.remove('visible');
+        panelToggle.classList.add('visible');
     });
-    toggleEl.addEventListener('click', () => {
-        panelEl.classList.add('visible');
-        toggleEl.classList.remove('visible');
-    });
-
-    let dragCounter = 0;
-    window.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; overlay.classList.add('active'); });
-    window.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-    window.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter <= 0) { dragCounter = 0; overlay.classList.remove('active'); } });
-    window.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragCounter = 0;
-        overlay.classList.remove('active');
-        const file = e.dataTransfer.files[0];
-        if (file) handleFile(file);
+    panelToggle.addEventListener('click', () => {
+        effectsPanel.classList.add('visible');
+        panelToggle.classList.remove('visible');
     });
 
-    controls.addEventListener('change', () => { needsRender = true; });
+    let dragDepth = 0;
+    window.addEventListener('dragenter', (ev) => { ev.preventDefault(); dragDepth++; dropOverlay.classList.add('active'); });
+    window.addEventListener('dragover', (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; });
+    window.addEventListener('dragleave', (ev) => { ev.preventDefault(); dragDepth--; if (dragDepth <= 0) { dragDepth = 0; dropOverlay.classList.remove('active'); } });
+    window.addEventListener('drop', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        dragDepth = 0;
+        dropOverlay.classList.remove('active');
+        const file = ev.dataTransfer.files[0];
+        if (file) ingestFile(file);
+    });
+
+    controls.addEventListener('change', () => { renderPending = true; });
 
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
@@ -694,20 +720,20 @@
     vignettePass.enabled = false;
     composer.addPass(vignettePass);
 
-    let bloomEnabled = false, ssaoEnabled = false, vignetteEnabled = false;
-    let useComposer = false;
+    let bloomOn = false, ssaoOn = false, vignetteOn = false;
+    let composerActive = false;
 
-    function updateComposerState() {
-        useComposer = bloomEnabled || ssaoEnabled || vignetteEnabled;
-        bloomPass.enabled = bloomEnabled;
-        ssaoPass.enabled = ssaoEnabled;
-        vignettePass.enabled = vignetteEnabled;
-        needsRender = true;
+    function syncComposer() {
+        composerActive = bloomOn || ssaoOn || vignetteOn;
+        bloomPass.enabled = bloomOn;
+        ssaoPass.enabled = ssaoOn;
+        vignettePass.enabled = vignetteOn;
+        renderPending = true;
     }
 
-    const bgColors = { black: new THREE.Color(0x000000), gray: new THREE.Color(0x333333) };
-    let gradientTexture = null;
-    function makeGradientTexture() {
+    const backgroundColors = { black: new THREE.Color(0x000000), gray: new THREE.Color(0x333333) };
+    let gradientTex = null;
+    function createGradientTexture() {
         const c = document.createElement('canvas');
         c.width = 2; c.height = 512;
         const ctx = c.getContext('2d');
@@ -722,105 +748,105 @@
         return tex;
     }
 
-    function setBackground(name) {
+    function applyBackground(name) {
         document.querySelectorAll('[data-bg]').forEach(b => b.classList.toggle('active', b.dataset.bg === name));
         stars.visible = false;
         if (name === 'gradient') {
-            if (!gradientTexture) gradientTexture = makeGradientTexture();
-            scene.background = gradientTexture;
+            if (!gradientTex) gradientTex = createGradientTexture();
+            scene.background = gradientTex;
         } else if (name === 'stars') {
-            scene.background = bgColors.black;
+            scene.background = backgroundColors.black;
             stars.visible = true;
         } else {
-            scene.background = bgColors[name] || bgColors.black;
+            scene.background = backgroundColors[name] || backgroundColors.black;
         }
-        needsRender = true;
+        renderPending = true;
     }
 
-    document.querySelectorAll('[data-bg]').forEach(b => b.addEventListener('click', () => setBackground(b.dataset.bg)));
+    document.querySelectorAll('[data-bg]').forEach(b => b.addEventListener('click', () => applyBackground(b.dataset.bg)));
 
-    document.getElementById('btn-bloom').addEventListener('click', (e) => {
-        bloomEnabled = !bloomEnabled;
-        e.currentTarget.classList.toggle('active', bloomEnabled);
-        updateComposerState();
+    document.getElementById('btn-bloom').addEventListener('click', (ev) => {
+        bloomOn = !bloomOn;
+        ev.currentTarget.classList.toggle('active', bloomOn);
+        syncComposer();
     });
-    document.getElementById('btn-ssao').addEventListener('click', (e) => {
-        ssaoEnabled = !ssaoEnabled;
-        e.currentTarget.classList.toggle('active', ssaoEnabled);
-        updateComposerState();
+    document.getElementById('btn-ssao').addEventListener('click', (ev) => {
+        ssaoOn = !ssaoOn;
+        ev.currentTarget.classList.toggle('active', ssaoOn);
+        syncComposer();
     });
-    document.getElementById('btn-vignette').addEventListener('click', (e) => {
-        vignetteEnabled = !vignetteEnabled;
-        e.currentTarget.classList.toggle('active', vignetteEnabled);
-        updateComposerState();
+    document.getElementById('btn-vignette').addEventListener('click', (ev) => {
+        vignetteOn = !vignetteOn;
+        ev.currentTarget.classList.toggle('active', vignetteOn);
+        syncComposer();
     });
 
-    const btnShadows = document.getElementById('btn-shadows');
-    btnShadows.addEventListener('click', () => {
+    const shadowButton = document.getElementById('btn-shadows');
+    shadowButton.addEventListener('click', () => {
         renderer.shadowMap.enabled = !renderer.shadowMap.enabled;
-        keyLight.castShadow = renderer.shadowMap.enabled;
-        btnShadows.classList.toggle('active', renderer.shadowMap.enabled);
-        meshRecords.forEach((r, mesh) => {
+        mainLight.castShadow = renderer.shadowMap.enabled;
+        shadowButton.classList.toggle('active', renderer.shadowMap.enabled);
+        meshState.forEach((r, mesh) => {
             mesh.castShadow = renderer.shadowMap.enabled;
             mesh.receiveShadow = renderer.shadowMap.enabled;
         });
-        needsRender = true;
+        renderPending = true;
     });
 
-    document.getElementById('exposure').addEventListener('input', (e) => {
-        renderer.toneMappingExposure = parseFloat(e.target.value);
-        needsRender = true;
+    document.getElementById('exposure').addEventListener('input', (ev) => {
+        renderer.toneMappingExposure = parseFloat(ev.target.value);
+        renderPending = true;
     });
 
-    animSelect.addEventListener('change', () => { playAnimation(parseInt(animSelect.value)); });
-    animPlay.addEventListener('click', togglePlay);
-    animSlider.addEventListener('input', () => {
-        if (!currentAction) return;
-        const clip = currentAction.getClip();
-        const t = (parseInt(animSlider.value) / 1000) * clip.duration;
-        currentAction.time = t;
+    animSelect.addEventListener('change', () => { startClip(parseInt(animSelect.value)); });
+    animToggle.addEventListener('click', togglePlayback);
+    animScrub.addEventListener('input', () => {
+        if (!activeAction) return;
+        const clip = activeAction.getClip();
+        const t = (parseInt(animScrub.value) / 1000) * clip.duration;
+        activeAction.time = t;
         if (mixer) mixer.update(0);
-        animTime.textContent = t.toFixed(2) + 's';
-        needsRender = true;
+        animClock.textContent = t.toFixed(2) + 's';
+        renderPending = true;
     });
 
-    window.addEventListener('keydown', (e) => {
-        if (e.key === ' ' && currentAction) { e.preventDefault(); togglePlay(); }
+    window.addEventListener('keydown', (ev) => {
+        if (ev.key === ' ' && activeAction) { ev.preventDefault(); togglePlayback(); }
     });
 
-    const clock = new THREE.Clock();
-    let fpsAccum = 0, fpsFrames = 0;
+    const frameClock = new THREE.Clock();
+    let fpsElapsed = 0, fpsCount = 0;
 
     function animate() {
         requestAnimationFrame(animate);
-        const dt = Math.min(clock.getDelta(), 0.05);
+        const dt = Math.min(frameClock.getDelta(), 0.05);
 
         if (mixer) {
             mixer.update(dt);
-            if (currentAction) {
-                const clip = currentAction.getClip();
-                animSlider.value = Math.min(1000, (currentAction.time / clip.duration) * 1000);
-                animTime.textContent = currentAction.time.toFixed(2) + 's';
+            if (activeAction) {
+                const clip = activeAction.getClip();
+                animScrub.value = Math.min(1000, (activeAction.time / clip.duration) * 1000);
+                animClock.textContent = activeAction.time.toFixed(2) + 's';
             }
-            needsRender = true;
+            renderPending = true;
         }
 
-        if (activeEffect === 'hologram' || effectMix < 1) {
-            updateEffectMix(dt);
-            needsRender = true;
+        if (currentEffect === 'hologram' || mixAmount < 1) {
+            advanceMix(dt);
+            renderPending = true;
         } else {
-            effectUniforms.uTime.value += dt;
+            fxUniforms.uTime.value += dt;
         }
 
-        if (controls.update()) needsRender = true;
+        if (controls.update()) renderPending = true;
 
-        fpsAccum += dt; fpsFrames++;
-        if (fpsAccum >= 0.5) { fpsEl.textContent = Math.round(fpsFrames / fpsAccum) + ' fps'; fpsAccum = 0; fpsFrames = 0; }
+        fpsElapsed += dt; fpsCount++;
+        if (fpsElapsed >= 0.5) { fpsBadge.textContent = Math.round(fpsCount / fpsElapsed) + ' fps'; fpsElapsed = 0; fpsCount = 0; }
 
-        if (needsRender) {
-            if (useComposer) composer.render();
+        if (renderPending) {
+            if (composerActive) composer.render();
             else renderer.render(scene, camera);
-            needsRender = false;
+            renderPending = false;
         }
     }
     animate();
@@ -830,7 +856,7 @@
         camera.updateProjectionMatrix();
         renderer.setSize(innerWidth, innerHeight);
         composer.setSize(innerWidth, innerHeight);
-        needsRender = true;
+        renderPending = true;
     });
     </script>
 </body>
